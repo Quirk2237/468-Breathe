@@ -28,12 +28,37 @@ struct ControlWidgetView: View {
         settings.widgetSize.windowSize
     }
     
-    private let ringColor = Color.orange
+    private let ringColor = Color(red: 53/255.0, green: 211/255.0, blue: 153/255.0)
     private let ringThickness: CGFloat = 4
     private let hoverInset: CGFloat = 12
     
+    private let buttonSize: CGFloat = 24
+    private let buttonPadding: CGFloat = 4
+    
+    private var settingsButtonPosition: CGPoint {
+        let circleRadius = widgetSize / 2
+        let angle: CGFloat = .pi / 4
+        let distance = circleRadius + buttonSize / 2 + buttonPadding
+        
+        let centerX = widgetWindowSize / 2 + distance * cos(angle)
+        let centerY = widgetWindowSize / 2 - distance * sin(angle)
+        
+        return CGPoint(x: centerX, y: centerY)
+    }
+    
+    private var endDayButtonPosition: CGPoint {
+        let circleRadius = widgetSize / 2
+        let angle: CGFloat = 3 * .pi / 4
+        let distance = circleRadius + buttonSize / 2 + buttonPadding
+        
+        let centerX = widgetWindowSize / 2 + distance * cos(angle)
+        let centerY = widgetWindowSize / 2 - distance * sin(angle)
+        
+        return CGPoint(x: centerX, y: centerY)
+    }
+    
     var body: some View {
-        ZStack(alignment: .topTrailing) {
+        ZStack {
             // Main circle content
             ZStack {
                 Circle()
@@ -63,8 +88,14 @@ struct ControlWidgetView: View {
             }
             
             if isHoveringWidget {
+                if timerManager.isDayActive {
+                    endDayButton
+                        .position(endDayButtonPosition)
+                        .transition(.scale.combined(with: .opacity))
+                }
+                
                 settingsButton
-                    .offset(x: 8, y: -8)
+                    .position(settingsButtonPosition)
                     .transition(.scale.combined(with: .opacity))
             }
         }
@@ -84,17 +115,36 @@ struct ControlWidgetView: View {
             windowManager.openSettings()
         } label: {
             Image(systemName: "gearshape.fill")
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.white.opacity(0.9))
-                .frame(width: 24, height: 24)
+                .frame(width: buttonSize, height: buttonSize)
                 .background(
                     Circle()
                         .fill(Color(white: 0.2))
-                        .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
+                        .shadow(color: .black.opacity(0.4), radius: 3, x: 0, y: 1)
                 )
         }
         .buttonStyle(.plain)
         .help("Open Settings")
+    }
+    
+    // MARK: - End Day Button
+    private var endDayButton: some View {
+        Button {
+            windowManager.endDay()
+        } label: {
+            Image(systemName: "moon.fill")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.white.opacity(0.9))
+                .frame(width: buttonSize, height: buttonSize)
+                .background(
+                    Circle()
+                        .fill(Color(white: 0.2))
+                        .shadow(color: .black.opacity(0.4), radius: 3, x: 0, y: 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .help("End Day")
     }
     
     private var timerFontSize: CGFloat {
@@ -115,6 +165,16 @@ struct ControlWidgetView: View {
     
     // MARK: - Timer Content
     private var timerContent: some View {
+        Group {
+            if timerManager.isDayActive {
+                dayActiveContent
+            } else {
+                startDayContent
+            }
+        }
+    }
+    
+    private var dayActiveContent: some View {
         ZStack {
             Circle()
                 .stroke(ringColor.opacity(0.3), lineWidth: ringThickness)
@@ -127,10 +187,9 @@ struct ControlWidgetView: View {
                 .rotationEffect(.degrees(-90))
                 .animation(.linear(duration: 0.5), value: timerManager.progress)
             
-            // Time remaining display
             Text(timerManager.formattedTimeShort)
                 .font(.system(size: timerFontSize, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.orange)
+                .foregroundStyle(ringColor)
                 .monospacedDigit()
             
             if isHoveringCircle {
@@ -147,11 +206,29 @@ struct ControlWidgetView: View {
         .animation(.easeInOut(duration: 0.15), value: isHoveringCircle)
     }
     
+    private var startDayContent: some View {
+        ZStack {
+            Circle()
+                .stroke(ringColor.opacity(0.2), lineWidth: ringThickness)
+                .padding(ringThickness / 2)
+            
+            VStack(spacing: 4) {
+                Image(systemName: "sunrise.fill")
+                    .font(.system(size: iconFontSize, weight: .medium))
+                    .foregroundStyle(ringColor.opacity(0.8))
+                
+                Text("Start Day")
+                    .font(.system(size: timerFontSize * 0.4, weight: .medium, design: .rounded))
+                    .foregroundStyle(ringColor.opacity(0.8))
+            }
+        }
+    }
+    
     // MARK: - Breathing Control Content
     private var breathingControlContent: some View {
         Text(timerManager.formattedTimeShort)
             .font(.system(size: timerFontSize, weight: .semibold, design: .rounded))
-            .foregroundStyle(Color.orange)
+            .foregroundStyle(ringColor)
             .monospacedDigit()
     }
     
@@ -214,8 +291,11 @@ struct ControlWidgetView: View {
         if windowManager.isPanelOpen {
             windowManager.focusBreathingPanel()
         } else {
-            // Toggle timer regimen instead of opening breathing panel directly
-            timerManager.toggle()
+            if !timerManager.isDayActive {
+                windowManager.startDay()
+            } else {
+                timerManager.toggle()
+            }
         }
     }
 }

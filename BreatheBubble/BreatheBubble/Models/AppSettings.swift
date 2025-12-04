@@ -19,25 +19,11 @@ enum WidgetSize: String, CaseIterable, Identifiable {
     
     var windowSize: CGFloat {
         switch self {
-        case .small: return 100
-        case .medium: return 120
-        case .large: return 140
+        case .small: return 140
+        case .medium: return 160
+        case .large: return 180
         }
     }
-}
-
-// MARK: - Sound Track
-struct SoundTrack: Identifiable, Equatable {
-    let id: String
-    let label: String
-    let filename: String // MP3 filename in bundle
-    
-    static let tracks: [SoundTrack] = [
-        SoundTrack(id: "ocean", label: "Ocean Waves", filename: "ocean"),
-        SoundTrack(id: "rain", label: "Gentle Rain", filename: "rain"),
-        SoundTrack(id: "forest", label: "Forest Birds", filename: "forest"),
-        SoundTrack(id: "stream", label: "Flowing Stream", filename: "stream"),
-    ]
 }
 
 // MARK: - App Settings
@@ -47,38 +33,6 @@ class AppSettings {
     var timerIntervalMinutes: Int = 30 {
         didSet {
             UserDefaults.standard.set(timerIntervalMinutes, forKey: "timerIntervalMinutes")
-        }
-    }
-    
-    // Breathing Settings
-    var breathingCycles: Int = 4 {
-        didSet {
-            UserDefaults.standard.set(breathingCycles, forKey: "breathingCycles")
-        }
-    }
-    
-    var includeHoldEmpty: Bool = false {
-        didSet {
-            UserDefaults.standard.set(includeHoldEmpty, forKey: "includeHoldEmpty")
-        }
-    }
-    
-    // Sound Settings
-    var soundEnabled: Bool = true {
-        didSet {
-            UserDefaults.standard.set(soundEnabled, forKey: "soundEnabled")
-        }
-    }
-    
-    var selectedTrackId: String = "ocean" {
-        didSet {
-            UserDefaults.standard.set(selectedTrackId, forKey: "selectedTrackId")
-        }
-    }
-    
-    var volume: Float = 0.5 {
-        didSet {
-            UserDefaults.standard.set(volume, forKey: "volume")
         }
     }
     
@@ -92,9 +46,52 @@ class AppSettings {
     
     var onWidgetSizeChange: ((WidgetSize) -> Void)?
     
-    // Computed
-    var selectedTrack: SoundTrack {
-        SoundTrack.tracks.first { $0.id == selectedTrackId } ?? SoundTrack.tracks[0]
+    // Activity Settings
+    var activityPlan = ActivityPlan()
+    
+    // Daily completion tracking (keyed by "YYYY-MM-DD")
+    var dailyCompletions: [String: [ActivityType: Int]] = [:] {
+        didSet {
+            saveDailyCompletions()
+        }
+    }
+    
+    func updateActivityConfig(for activity: ActivityType, config: ActivityConfig) {
+        activityPlan.updateConfig(for: activity, config: config)
+        saveActivitySettings()
+    }
+    
+    // MARK: - Completion Tracking
+    func recordCompletion(_ activity: ActivityType, for date: Date) {
+        let dateKey = dateKeyString(for: date)
+        if dailyCompletions[dateKey] == nil {
+            dailyCompletions[dateKey] = [:]
+        }
+        dailyCompletions[dateKey]?[activity, default: 0] += 1
+    }
+    
+    func getCompletions(for date: Date) -> [ActivityType: Int] {
+        let dateKey = dateKeyString(for: date)
+        return dailyCompletions[dateKey] ?? [:]
+    }
+    
+    func getCompletionPercentage(for date: Date) -> Double {
+        let completions = getCompletions(for: date)
+        let enabledActivities = activityPlan.enabledActivities
+        
+        guard !enabledActivities.isEmpty else { return 0 }
+        
+        let completedCount = enabledActivities.filter { activity in
+            (completions[activity] ?? 0) > 0
+        }.count
+        
+        return Double(completedCount) / Double(enabledActivities.count)
+    }
+    
+    private func dateKeyString(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
     }
     
     // MARK: - Initialization
@@ -109,41 +106,141 @@ class AppSettings {
             timerIntervalMinutes = defaults.integer(forKey: "timerIntervalMinutes")
         }
         
-        if defaults.object(forKey: "breathingCycles") != nil {
-            breathingCycles = defaults.integer(forKey: "breathingCycles")
-        }
-        
-        includeHoldEmpty = defaults.bool(forKey: "includeHoldEmpty")
-        
-        if defaults.object(forKey: "soundEnabled") != nil {
-            soundEnabled = defaults.bool(forKey: "soundEnabled")
-        } else {
-            soundEnabled = true // Default
-        }
-        
-        if let trackId = defaults.string(forKey: "selectedTrackId") {
-            selectedTrackId = trackId
-        }
-        
-        if defaults.object(forKey: "volume") != nil {
-            volume = defaults.float(forKey: "volume")
-        }
-        
         if let sizeRaw = defaults.string(forKey: "widgetSize"),
            let size = WidgetSize(rawValue: sizeRaw) {
             widgetSize = size
         }
+        
+        loadActivitySettings()
+        loadDailyCompletions()
+    }
+    
+    // MARK: - Activity Settings Persistence
+    private func saveActivitySettings() {
+        let defaults = UserDefaults.standard
+        
+        for activity in ActivityType.allCases {
+            let config = activityPlan.getConfig(for: activity)
+            let key = "activity_\(activity.rawValue)_enabled"
+            let repKey = "activity_\(activity.rawValue)_reps"
+            
+            defaults.set(config.enabled, forKey: key)
+            defaults.set(config.repCount, forKey: repKey)
+            
+            if activity == .breathwork {
+                defaults.set(config.breathingCycles, forKey: "activity_\(activity.rawValue)_cycles")
+                defaults.set(config.includeHoldEmpty, forKey: "activity_\(activity.rawValue)_holdEmpty")
+            }
+        }
+    }
+    
+    private func loadActivitySettings() {
+        let defaults = UserDefaults.standard
+        
+        for activity in ActivityType.allCases {
+            let enabledKey = "activity_\(activity.rawValue)_enabled"
+            let repKey = "activity_\(activity.rawValue)_reps"
+            
+            let enabled: Bool
+            if defaults.object(forKey: enabledKey) != nil {
+                enabled = defaults.bool(forKey: enabledKey)
+            } else {
+                enabled = activity == .breathwork
+            }
+            
+            let repCount: Int
+            if defaults.object(forKey: repKey) != nil {
+                repCount = defaults.integer(forKey: repKey)
+            } else {
+                repCount = 10
+            }
+            
+            if activity == .breathwork {
+                let cyclesKey = "activity_\(activity.rawValue)_cycles"
+                let holdEmptyKey = "activity_\(activity.rawValue)_holdEmpty"
+                
+                let breathingCycles: Int
+                if defaults.object(forKey: cyclesKey) != nil {
+                    breathingCycles = defaults.integer(forKey: cyclesKey)
+                } else if defaults.object(forKey: "breathingCycles") != nil {
+                    breathingCycles = defaults.integer(forKey: "breathingCycles")
+                    defaults.set(breathingCycles, forKey: cyclesKey)
+                } else {
+                    breathingCycles = 4
+                }
+                
+                let includeHoldEmpty: Bool
+                if defaults.object(forKey: holdEmptyKey) != nil {
+                    includeHoldEmpty = defaults.bool(forKey: holdEmptyKey)
+                } else if defaults.object(forKey: "includeHoldEmpty") != nil {
+                    includeHoldEmpty = defaults.bool(forKey: "includeHoldEmpty")
+                    defaults.set(includeHoldEmpty, forKey: holdEmptyKey)
+                } else {
+                    includeHoldEmpty = false
+                }
+                
+                activityPlan.updateConfig(for: activity, config: ActivityConfig(
+                    enabled: enabled,
+                    repCount: repCount,
+                    breathingCycles: breathingCycles,
+                    includeHoldEmpty: includeHoldEmpty
+                ))
+            } else {
+                activityPlan.updateConfig(for: activity, config: ActivityConfig(enabled: enabled, repCount: repCount))
+            }
+        }
+    }
+    
+    // MARK: - Daily Completions Persistence
+    private func saveDailyCompletions() {
+        let defaults = UserDefaults.standard
+        
+        var serializable: [String: [String: Int]] = [:]
+        for (dateKey, activities) in dailyCompletions {
+            var activitiesDict: [String: Int] = [:]
+            for (activity, count) in activities {
+                activitiesDict[activity.rawValue] = count
+            }
+            serializable[dateKey] = activitiesDict
+        }
+        
+        if let data = try? JSONSerialization.data(withJSONObject: serializable) {
+            defaults.set(data, forKey: "dailyCompletions")
+        }
+    }
+    
+    private func loadDailyCompletions() {
+        let defaults = UserDefaults.standard
+        
+        guard let data = defaults.data(forKey: "dailyCompletions"),
+              let serializable = try? JSONSerialization.jsonObject(with: data) as? [String: [String: Int]] else {
+            return
+        }
+        
+        var completions: [String: [ActivityType: Int]] = [:]
+        for (dateKey, activitiesDict) in serializable {
+            var activities: [ActivityType: Int] = [:]
+            for (activityRaw, count) in activitiesDict {
+                if let activity = ActivityType(rawValue: activityRaw) {
+                    activities[activity] = count
+                }
+            }
+            completions[dateKey] = activities
+        }
+        
+        dailyCompletions = completions
     }
     
     // MARK: - Reset
     func resetToDefaults() {
         timerIntervalMinutes = 30
-        breathingCycles = 4
-        includeHoldEmpty = false
-        soundEnabled = true
-        selectedTrackId = "ocean"
-        volume = 0.5
         widgetSize = .medium
+        
+        activityPlan = ActivityPlan()
+        activityPlan.updateConfig(for: .breathwork, config: ActivityConfig(enabled: true, repCount: 0, breathingCycles: 4, includeHoldEmpty: false))
+        activityPlan.updateConfig(for: .pushups, config: ActivityConfig(enabled: false, repCount: 10))
+        activityPlan.updateConfig(for: .situps, config: ActivityConfig(enabled: false, repCount: 10))
+        saveActivitySettings()
     }
 }
 

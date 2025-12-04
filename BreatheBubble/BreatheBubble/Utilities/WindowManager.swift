@@ -6,16 +6,18 @@ class WindowManager: ObservableObject {
     // Windows
     private var floatingBubbleWindow: NSWindow?
     private var breathingPanelWindow: NSWindow?
+    private var exercisePanelWindow: NSWindow?
     private var settingsWindow: NSWindow?
     
     // Shared state
     @Published var timerManager = TimerManager()
     @Published var breathingSession = BreathingSession()
+    @Published var exerciseSession = ExerciseSession()
     @Published var settings = AppSettings.shared
-    @Published var audioManager = AudioManager.shared
     
     // Panel state
     @Published var isPanelOpen: Bool = false
+    @Published var currentActivityType: ActivityType?
     
     private var windowMoveObserver: Any?
     private var snapDebounceTimer: Timer?
@@ -38,6 +40,7 @@ class WindowManager: ObservableObject {
         
         setupTimerCallback()
         setupSessionCallback()
+        setupExerciseSessionCallback()
         setupWidgetSizeCallback()
     }
     
@@ -82,7 +85,7 @@ class WindowManager: ObservableObject {
     private func setupTimerCallback() {
         timerManager.onTimerComplete = { [weak self] in
             DispatchQueue.main.async {
-                self?.openBreathingPanel()
+                self?.selectAndOpenActivity()
             }
         }
     }
@@ -90,8 +93,35 @@ class WindowManager: ObservableObject {
     private func setupSessionCallback() {
         breathingSession.onComplete = { [weak self] in
             DispatchQueue.main.async {
+                self?.settings.recordCompletion(.breathwork, for: Date())
                 self?.closeBreathingPanel()
             }
+        }
+    }
+    
+    private func setupExerciseSessionCallback() {
+        exerciseSession.onComplete = { [weak self] in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.settings.recordCompletion(self.exerciseSession.exerciseType, for: Date())
+            }
+        }
+    }
+    
+    // MARK: - Activity Selection
+    private func selectAndOpenActivity() {
+        guard let selectedActivity = settings.activityPlan.selectRandomActivity() else {
+            timerManager.restartAfterBreathing()
+            return
+        }
+        
+        currentActivityType = selectedActivity
+        
+        switch selectedActivity {
+        case .breathwork:
+            openBreathingPanel()
+        case .pushups, .situps:
+            openExercisePanel(for: selectedActivity)
         }
     }
     
@@ -140,9 +170,15 @@ class WindowManager: ObservableObject {
         ) { [weak self] _ in
             self?.handleWidgetMove()
         }
-        
-        // Start timer automatically
-        timerManager.start()
+    }
+    
+    // MARK: - Day Management
+    func startDay() {
+        timerManager.startDay()
+    }
+    
+    func endDay() {
+        timerManager.endDay()
     }
     
     // MARK: - Handle Widget Movement
@@ -237,14 +273,12 @@ class WindowManager: ObservableObject {
         let widgetFrame = widgetWindow.frame
         let panelFrame = panelWindow.frame
         
-        // Calculate widget center relative to panel center
         let widgetCenter = NSPoint(x: widgetFrame.midX, y: widgetFrame.midY)
         let panelCenter = NSPoint(x: panelFrame.midX, y: panelFrame.midY)
         
         let dx = widgetCenter.x - panelCenter.x
         let dy = widgetCenter.y - panelCenter.y
         
-        // Determine which side the widget should snap to based on drag direction
         let newOrbitPosition: OrbitPosition
         if abs(dx) > abs(dy) {
             newOrbitPosition = dx > 0 ? .right : .left
@@ -254,10 +288,8 @@ class WindowManager: ObservableObject {
         
         widgetOrbitPosition = newOrbitPosition
         
-        // Calculate snap position around the panel
         let snapPoint = calculateOrbitSnapPoint(panelFrame: panelFrame, position: newOrbitPosition)
         
-        // Animate widget to orbit position
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.25
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
@@ -294,7 +326,6 @@ class WindowManager: ObservableObject {
             )
         }
         
-        // Clamp to screen bounds
         point.x = max(screenFrame.minX + edgePadding, min(point.x, screenFrame.maxX - widgetSize - edgePadding))
         point.y = max(screenFrame.minY + edgePadding, min(point.y, screenFrame.maxY - widgetSize - edgePadding))
         
@@ -333,7 +364,6 @@ class WindowManager: ObservableObject {
         
         panel.contentView = hostingView
         
-        // Animate in (panel is independent, not a child window)
         panel.alphaValue = 0
         panel.orderFront(nil)
         
@@ -345,16 +375,10 @@ class WindowManager: ObservableObject {
         breathingPanelWindow = panel
         isPanelOpen = true
         
-        // Configure breathing session
-        breathingSession.totalCycles = settings.breathingCycles
-        breathingSession.includeHoldEmpty = settings.includeHoldEmpty
+        let breathworkConfig = settings.activityPlan.getConfig(for: .breathwork)
+        breathingSession.totalCycles = breathworkConfig.breathingCycles
+        breathingSession.includeHoldEmpty = breathworkConfig.includeHoldEmpty
         
-        // Start audio if enabled
-        if settings.soundEnabled {
-            audioManager.play(track: settings.selectedTrack, volume: settings.volume)
-        }
-        
-        // Pause timer while breathing
         timerManager.pause()
     }
     
@@ -382,13 +406,8 @@ class WindowManager: ObservableObject {
     func closeBreathingPanel() {
         guard let panel = breathingPanelWindow else { return }
         
-        // Stop breathing
         breathingSession.reset()
         
-        // Stop audio
-        audioManager.stop()
-        
-        // Animate out
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.2
             panel.animator().alphaValue = 0
@@ -396,8 +415,73 @@ class WindowManager: ObservableObject {
             panel.orderOut(nil)
             self?.breathingPanelWindow = nil
             self?.isPanelOpen = false
-            
-            // Restart timer
+            self?.currentActivityType = nil
+            self?.timerManager.restartAfterBreathing()
+        })
+    }
+    
+    // MARK: - Exercise Panel Window
+    func openExercisePanel(for activity: ActivityType) {
+        guard !isPanelOpen else { return }
+        guard let bubbleWindow = floatingBubbleWindow else { return }
+        
+        let bubbleFrame = bubbleWindow.frame
+        let panelPosition = calculatePanelPosition(widgetFrame: bubbleFrame)
+        
+        let config = settings.activityPlan.getConfig(for: activity)
+        exerciseSession.configure(exerciseType: activity, repCount: config.repCount)
+        
+        let panel = NSPanel(
+            contentRect: NSRect(x: panelPosition.x, y: panelPosition.y, width: panelSize, height: panelSize),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        
+        panel.level = .floating
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = false
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.hidesOnDeactivate = false
+        panel.isMovableByWindowBackground = true
+        
+        let contentView = ExercisePanelView(windowManager: self)
+        let hostingView = NSHostingView(rootView: contentView)
+        hostingView.frame = panel.contentView!.bounds
+        hostingView.autoresizingMask = [.width, .height]
+        hostingView.wantsLayer = true
+        hostingView.layer?.backgroundColor = .clear
+        
+        panel.contentView = hostingView
+        
+        panel.alphaValue = 0
+        panel.orderFront(nil)
+        
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.3
+            panel.animator().alphaValue = 1
+        }
+        
+        exercisePanelWindow = panel
+        isPanelOpen = true
+        
+        timerManager.pause()
+    }
+    
+    func closeExercisePanel() {
+        guard let panel = exercisePanelWindow else { return }
+        
+        exerciseSession.reset()
+        
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.2
+            panel.animator().alphaValue = 0
+        }, completionHandler: { [weak self] in
+            panel.orderOut(nil)
+            self?.exercisePanelWindow = nil
+            self?.isPanelOpen = false
+            self?.currentActivityType = nil
             self?.timerManager.restartAfterBreathing()
         })
     }
@@ -405,7 +489,11 @@ class WindowManager: ObservableObject {
     // MARK: - Toggle Panel
     func toggleBreathingPanel() {
         if isPanelOpen {
-            closeBreathingPanel()
+            if breathingPanelWindow != nil {
+                closeBreathingPanel()
+            } else if exercisePanelWindow != nil {
+                closeExercisePanel()
+            }
         } else {
             openBreathingPanel()
         }
@@ -418,14 +506,12 @@ class WindowManager: ObservableObject {
     
     // MARK: - Settings Window
     func openSettings() {
-        // If settings window already exists, bring it to front
         if let existingWindow = settingsWindow {
             existingWindow.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
         }
         
-        // Calculate centered position
         guard let screen = NSScreen.main else { return }
         let screenFrame = screen.visibleFrame
         let settingsWidth: CGFloat = 400
@@ -448,7 +534,6 @@ class WindowManager: ObservableObject {
         
         let contentView = SettingsView(
             settings: settings,
-            audioManager: audioManager,
             timerManager: timerManager,
             session: isPanelOpen ? breathingSession : nil,
             onDismiss: { [weak self] in
@@ -462,7 +547,6 @@ class WindowManager: ObservableObject {
         
         window.contentView = hostingView
         
-        // Animate in
         window.alphaValue = 0
         window.orderFront(nil)
         window.makeKey()
@@ -475,7 +559,6 @@ class WindowManager: ObservableObject {
         
         settingsWindow = window
         
-        // Watch for window close
         NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification,
             object: window,

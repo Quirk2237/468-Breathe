@@ -95,7 +95,7 @@ struct BreathingPanelView: View {
             }
         }
         .sheet(isPresented: $showSettings) {
-            SettingsView(settings: settings, audioManager: windowManager.audioManager, session: session)
+            SettingsView(settings: settings, session: session)
         }
     }
     

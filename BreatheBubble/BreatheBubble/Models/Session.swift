@@ -236,6 +236,13 @@ class TimerManager {
     var remainingSeconds: Int = 30 * 60
     var totalSeconds: Int = 30 * 60
     
+    var dayStarted: Bool = false
+    var dayStartTime: Date?
+    
+    var isDayActive: Bool {
+        dayStarted && dayStartTime != nil
+    }
+    
     var intervalMinutes: Int = 30 {
         didSet {
             if state == .idle {
@@ -270,6 +277,7 @@ class TimerManager {
     
     private var timer: Timer?
     var onTimerComplete: (() -> Void)?
+    var onDayEnd: (() -> Void)?
     
     init() {
         requestNotificationPermission()
@@ -286,12 +294,41 @@ class TimerManager {
     func start() {
         guard state != .running else { return }
         
+        if !dayStarted {
+            startDay()
+        }
+        
         if state == .idle || state == .completed {
             remainingSeconds = totalSeconds
         }
         
         state = .running
         startTimer()
+    }
+    
+    func startDay() {
+        dayStarted = true
+        dayStartTime = Date()
+        
+        if state == .idle || state == .completed {
+            remainingSeconds = totalSeconds
+        }
+        
+        if state != .running {
+            state = .running
+            startTimer()
+        }
+    }
+    
+    func endDay() {
+        stopTimer()
+        state = .idle
+        remainingSeconds = totalSeconds
+        
+        dayStarted = false
+        dayStartTime = nil
+        
+        onDayEnd?()
     }
     
     func pause() {
@@ -378,6 +415,64 @@ class TimerManager {
     func restartAfterBreathing() {
         reset()
         start()
+    }
+}
+
+// MARK: - Exercise Session State
+enum ExerciseState {
+    case idle
+    case active
+    case completed
+}
+
+// MARK: - Exercise Session
+@Observable
+class ExerciseSession {
+    var exerciseType: ActivityType = .pushups
+    var targetReps: Int = 10
+    var state: ExerciseState = .idle
+    var onComplete: (() -> Void)?
+    
+    var exerciseName: String {
+        exerciseType.displayName
+    }
+    
+    var exerciseIcon: String {
+        exerciseType.icon
+    }
+    
+    var exerciseInstruction: String {
+        exerciseType.instruction
+    }
+    
+    var exerciseColor: SIMD3<Float> {
+        switch exerciseType {
+        case .breathwork:
+            return SIMD3<Float>(0.4, 0.8, 1.0)
+        case .pushups:
+            return SIMD3<Float>(1.0, 0.5, 0.3)
+        case .situps:
+            return SIMD3<Float>(0.3, 0.8, 0.5)
+        }
+    }
+    
+    func configure(exerciseType: ActivityType, repCount: Int) {
+        self.exerciseType = exerciseType
+        self.targetReps = repCount
+        reset()
+    }
+    
+    func start() {
+        state = .active
+    }
+    
+    func complete() {
+        state = .completed
+        onComplete?()
+    }
+    
+    func reset() {
+        state = .idle
     }
 }
 
