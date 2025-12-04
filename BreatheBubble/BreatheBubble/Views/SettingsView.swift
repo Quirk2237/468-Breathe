@@ -4,12 +4,22 @@ import SwiftUI
 struct SettingsView: View {
     @Bindable var settings: AppSettings
     var audioManager: AudioManager
+    var timerManager: TimerManager?
     var session: BreathingSession?
     var onDismiss: (() -> Void)?
     
     @Environment(\.dismiss) private var environmentDismiss
     
     private func handleDismiss() {
+        if let timerManager = timerManager {
+            let newTotalSeconds = settings.timerIntervalMinutes * 60
+            let elapsedSeconds = timerManager.totalSeconds - timerManager.remainingSeconds
+            
+            timerManager.totalSeconds = newTotalSeconds
+            timerManager.remainingSeconds = max(0, newTotalSeconds - elapsedSeconds)
+            timerManager.intervalMinutes = settings.timerIntervalMinutes
+        }
+        
         if let onDismiss = onDismiss {
             onDismiss()
         } else {
@@ -19,36 +29,24 @@ struct SettingsView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header
             HStack {
                 Text("Settings")
                     .font(.system(size: 18, weight: .semibold, design: .rounded))
                 
                 Spacer()
-                
-                Button {
-                    handleDismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 24, height: 24)
-                        .background(.quaternary)
-                        .clipShape(Circle())
-                }
-                .buttonStyle(.plain)
             }
-            .padding()
+            .padding(.horizontal)
+            .padding(.top, 8)
+            .padding(.bottom, 12)
             
             Divider()
             
             ScrollView {
                 VStack(spacing: 24) {
-                    // Timer Section
-                    settingsSection("Timer") {
-                        VStack(alignment: .leading, spacing: 12) {
+                    settingsSection("Breathing") {
+                        VStack(alignment: .leading, spacing: 16) {
                             HStack {
-                                Text("Interval")
+                                Text("Reminder Interval")
                                     .foregroundStyle(.secondary)
                                 Spacer()
                                 Text("\(settings.timerIntervalMinutes) min")
@@ -65,12 +63,9 @@ struct SettingsView: View {
                                 step: 5
                             )
                             .tint(.cyan)
-                        }
-                    }
-                    
-                    // Breathing Section
-                    settingsSection("Breathing") {
-                        VStack(alignment: .leading, spacing: 16) {
+                            
+                            Divider()
+                            
                             HStack {
                                 Text("Cycles")
                                     .foregroundStyle(.secondary)
@@ -158,7 +153,36 @@ struct SettingsView: View {
                         }
                     }
                     
-                    // Session Section (only show when session is active)
+                    settingsSection("Widget") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Size")
+                                .foregroundStyle(.secondary)
+                            
+                            HStack(spacing: 12) {
+                                ForEach(WidgetSize.allCases) { size in
+                                    Button {
+                                        settings.widgetSize = size
+                                    } label: {
+                                        Text(size.rawValue)
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundStyle(settings.widgetSize == size ? .white : .primary)
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, 10)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .fill(settings.widgetSize == size ? Color.cyan : Color.clear)
+                                            )
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .stroke(settings.widgetSize == size ? Color.clear : Color.secondary.opacity(0.3), lineWidth: 1)
+                                            )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+                    
                     if let session = session {
                         settingsSection("Session") {
                             VStack(alignment: .leading, spacing: 12) {
@@ -193,14 +217,6 @@ struct SettingsView: View {
                             }
                         }
                     }
-                    
-                    // Info Section
-                    settingsSection("About 4-6-8") {
-                        Text("The 4-6-8 breathing technique acts as a natural tranquilizer for the nervous system. Inhale for 4 seconds, hold for 6, and exhale for 8. Practice regularly for best results.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineSpacing(4)
-                    }
                 }
                 .padding()
             }
@@ -220,7 +236,7 @@ struct SettingsView: View {
             .tint(.cyan)
             .padding()
         }
-        .frame(width: 320, height: 500)
+        .frame(width: 400, height: 580)
         .background(.regularMaterial)
     }
     

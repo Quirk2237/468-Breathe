@@ -4,7 +4,8 @@ import SwiftUI
 struct ControlWidgetView: View {
     @ObservedObject var windowManager: WindowManager
     
-    @State private var isHovering = false
+    @State private var isHoveringWidget = false
+    @State private var isHoveringCircle = false
     @State private var showContextMenu = false
     
     private var timerManager: TimerManager {
@@ -15,8 +16,21 @@ struct ControlWidgetView: View {
         windowManager.breathingSession
     }
     
+    private var settings: AppSettings {
+        windowManager.settings
+    }
+    
+    private var widgetSize: CGFloat {
+        settings.widgetSize.dimension
+    }
+    
+    private var widgetWindowSize: CGFloat {
+        settings.widgetSize.windowSize
+    }
+    
     private let ringColor = Color.orange
     private let ringThickness: CGFloat = 4
+    private let hoverInset: CGFloat = 12
     
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -31,8 +45,13 @@ struct ControlWidgetView: View {
                     timerContent
                 }
             }
-            .frame(width: 100, height: 100)
+            .frame(width: widgetSize, height: widgetSize)
             .contentShape(Circle())
+            .onHover { hovering in
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    isHoveringCircle = hovering
+                }
+            }
             .onTapGesture {
                 handleTap()
             }
@@ -43,18 +62,17 @@ struct ControlWidgetView: View {
                 contextMenuContent
             }
             
-            // Settings icon - appears on hover, positioned outside top-right
-            if isHovering {
+            if isHoveringWidget {
                 settingsButton
                     .offset(x: 8, y: -8)
                     .transition(.scale.combined(with: .opacity))
             }
         }
-        .frame(width: 120, height: 120) // Larger frame to accommodate settings icon
+        .frame(width: widgetWindowSize, height: widgetWindowSize)
         .background(Color.clear)
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
-                isHovering = hovering
+                isHoveringWidget = hovering
             }
         }
         .help(windowManager.isPanelOpen ? "Click to focus breathing panel" : "Click to start/pause timer\nRight-click for options")
@@ -79,6 +97,22 @@ struct ControlWidgetView: View {
         .help("Open Settings")
     }
     
+    private var timerFontSize: CGFloat {
+        switch settings.widgetSize {
+        case .small: return 20
+        case .medium: return 26
+        case .large: return 32
+        }
+    }
+    
+    private var iconFontSize: CGFloat {
+        switch settings.widgetSize {
+        case .small: return 18
+        case .medium: return 24
+        case .large: return 30
+        }
+    }
+    
     // MARK: - Timer Content
     private var timerContent: some View {
         ZStack {
@@ -95,29 +129,28 @@ struct ControlWidgetView: View {
             
             // Time remaining display
             Text(timerManager.formattedTimeShort)
-                .font(.system(size: 26, weight: .semibold, design: .rounded))
+                .font(.system(size: timerFontSize, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.orange)
                 .monospacedDigit()
             
-            // Hover overlay with play/pause
-            if isHovering {
+            if isHoveringCircle {
                 Circle()
                     .fill(Color.black.opacity(0.6))
-                    .padding(ringThickness)
+                    .padding(hoverInset)
                 
                 Image(systemName: timerManager.isRunning ? "pause.fill" : "play.fill")
-                    .font(.system(size: 28, weight: .medium))
+                    .font(.system(size: iconFontSize, weight: .medium))
                     .foregroundStyle(.white)
                     .transition(.opacity)
             }
         }
-        .animation(.easeInOut(duration: 0.15), value: isHovering)
+        .animation(.easeInOut(duration: 0.15), value: isHoveringCircle)
     }
     
     // MARK: - Breathing Control Content
     private var breathingControlContent: some View {
         Text(timerManager.formattedTimeShort)
-            .font(.system(size: 26, weight: .semibold, design: .rounded))
+            .font(.system(size: timerFontSize, weight: .semibold, design: .rounded))
             .foregroundStyle(Color.orange)
             .monospacedDigit()
     }

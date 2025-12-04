@@ -19,7 +19,8 @@ class WindowManager: ObservableObject {
     
     private var windowMoveObserver: Any?
     private var snapDebounceTimer: Timer?
-    private let widgetSize: CGFloat = 100
+    private var widgetSize: CGFloat = 100
+    private var widgetWindowSize: CGFloat = 120
     private let panelSize: CGFloat = 340
     private let edgePadding: CGFloat = 20
     private let orbitGap: CGFloat = 10
@@ -32,8 +33,43 @@ class WindowManager: ObservableObject {
     }
     
     init() {
+        widgetSize = settings.widgetSize.dimension
+        widgetWindowSize = settings.widgetSize.windowSize
+        
         setupTimerCallback()
         setupSessionCallback()
+        setupWidgetSizeCallback()
+    }
+    
+    private func setupWidgetSizeCallback() {
+        settings.onWidgetSizeChange = { [weak self] newSize in
+            self?.updateWidgetSize(newSize)
+        }
+    }
+    
+    private func updateWidgetSize(_ size: WidgetSize) {
+        widgetSize = size.dimension
+        widgetWindowSize = size.windowSize
+        
+        guard let window = floatingBubbleWindow else { return }
+        
+        let oldFrame = window.frame
+        let oldCenter = NSPoint(x: oldFrame.midX, y: oldFrame.midY)
+        let newOrigin = NSPoint(
+            x: oldCenter.x - widgetWindowSize / 2,
+            y: oldCenter.y - widgetWindowSize / 2
+        )
+        
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.2
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            window.animator().setFrame(
+                NSRect(x: newOrigin.x, y: newOrigin.y, width: widgetWindowSize, height: widgetWindowSize),
+                display: true
+            )
+        } completionHandler: { [weak self] in
+            self?.snapWidgetToNearestPoint()
+        }
     }
     
     deinit {
@@ -63,16 +99,13 @@ class WindowManager: ObservableObject {
     func showFloatingBubble() {
         if floatingBubbleWindow != nil { return }
         
-        // Create floating panel (120x120 to accommodate settings icon on hover)
-        let windowSize: CGFloat = 120
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: windowSize, height: windowSize),
+            contentRect: NSRect(x: 0, y: 0, width: widgetWindowSize, height: widgetWindowSize),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
         
-        // Configure panel
         panel.level = .floating
         panel.isOpaque = false
         panel.backgroundColor = .clear
@@ -83,8 +116,7 @@ class WindowManager: ObservableObject {
         
         if let screen = NSScreen.main {
             let screenFrame = screen.visibleFrame
-            // Position using window size (120) to properly account for settings icon area
-            let x = screenFrame.maxX - windowSize - edgePadding
+            let x = screenFrame.maxX - widgetWindowSize - edgePadding
             let y = screenFrame.minY + edgePadding
             panel.setFrameOrigin(NSPoint(x: x, y: y))
         }
@@ -115,9 +147,7 @@ class WindowManager: ObservableObject {
     
     // MARK: - Handle Widget Movement
     private func handleWidgetMove() {
-        if isPanelOpen {
-            scheduleOrbitSnap()
-        } else {
+        if !isPanelOpen {
             scheduleSnap()
         }
     }
@@ -276,11 +306,9 @@ class WindowManager: ObservableObject {
         guard !isPanelOpen else { return }
         guard let bubbleWindow = floatingBubbleWindow else { return }
         
-        // Calculate panel position (centered on screen, clamped to visible area)
         let bubbleFrame = bubbleWindow.frame
-        let panelPosition = calculateCenteredPanelPosition(widgetFrame: bubbleFrame)
+        let panelPosition = calculatePanelPosition(widgetFrame: bubbleFrame)
         
-        // Create panel (independent window, not a child)
         let panel = NSPanel(
             contentRect: NSRect(x: panelPosition.x, y: panelPosition.y, width: panelSize, height: panelSize),
             styleMask: [.borderless, .nonactivatingPanel],
@@ -294,6 +322,7 @@ class WindowManager: ObservableObject {
         panel.hasShadow = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.hidesOnDeactivate = false
+        panel.isMovableByWindowBackground = true
         
         let contentView = BreathingPanelView(windowManager: self)
         let hostingView = NSHostingView(rootView: contentView)
@@ -316,9 +345,6 @@ class WindowManager: ObservableObject {
         breathingPanelWindow = panel
         isPanelOpen = true
         
-        // Position widget to the side of the panel
-        positionWidgetAroundPanel(panelFrame: panel.frame)
-        
         // Configure breathing session
         breathingSession.totalCycles = settings.breathingCycles
         breathingSession.includeHoldEmpty = settings.includeHoldEmpty
@@ -332,60 +358,25 @@ class WindowManager: ObservableObject {
         timerManager.pause()
     }
     
-    // Calculate panel position centered near widget but clamped to screen
-    private func calculateCenteredPanelPosition(widgetFrame: NSRect) -> NSPoint {
+    private func calculatePanelPosition(widgetFrame: NSRect) -> NSPoint {
         guard let screen = NSScreen.main else {
-            return NSPoint(x: widgetFrame.minX - panelSize - orbitGap, y: widgetFrame.midY - panelSize / 2)
+            return NSPoint(x: widgetFrame.midX - panelSize / 2, y: widgetFrame.maxY + orbitGap)
         }
         
         let screenFrame = screen.visibleFrame
+        let gap: CGFloat = 20
         
-        // Try to center panel near the widget
         var panelX = widgetFrame.midX - panelSize / 2
-        var panelY = widgetFrame.midY - panelSize / 2
+        var panelY = widgetFrame.maxY + gap
         
-        // Clamp to screen bounds with padding
         panelX = max(screenFrame.minX + edgePadding, min(panelX, screenFrame.maxX - panelSize - edgePadding))
+        
+        if panelY + panelSize > screenFrame.maxY - edgePadding {
+            panelY = widgetFrame.minY - panelSize - gap
+        }
         panelY = max(screenFrame.minY + edgePadding, min(panelY, screenFrame.maxY - panelSize - edgePadding))
         
         return NSPoint(x: panelX, y: panelY)
-    }
-    
-    // Position widget around panel based on available space
-    private func positionWidgetAroundPanel(panelFrame: NSRect) {
-        guard let widgetWindow = floatingBubbleWindow,
-              let screen = NSScreen.main else { return }
-        
-        let screenFrame = screen.visibleFrame
-        
-        // Determine best orbit position based on available space
-        let spaceRight = screenFrame.maxX - panelFrame.maxX
-        let spaceLeft = panelFrame.minX - screenFrame.minX
-        let spaceTop = screenFrame.maxY - panelFrame.maxY
-        let spaceBottom = panelFrame.minY - screenFrame.minY
-        
-        let requiredSpace = widgetSize + orbitGap + edgePadding
-        
-        // Choose position with most space
-        if spaceRight >= requiredSpace {
-            widgetOrbitPosition = .right
-        } else if spaceLeft >= requiredSpace {
-            widgetOrbitPosition = .left
-        } else if spaceBottom >= requiredSpace {
-            widgetOrbitPosition = .bottom
-        } else if spaceTop >= requiredSpace {
-            widgetOrbitPosition = .top
-        } else {
-            widgetOrbitPosition = .right // Fallback
-        }
-        
-        let snapPoint = calculateOrbitSnapPoint(panelFrame: panelFrame, position: widgetOrbitPosition)
-        
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.3
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            widgetWindow.animator().setFrameOrigin(snapPoint)
-        }
     }
     
     func closeBreathingPanel() {
@@ -437,31 +428,28 @@ class WindowManager: ObservableObject {
         // Calculate centered position
         guard let screen = NSScreen.main else { return }
         let screenFrame = screen.visibleFrame
-        let settingsWidth: CGFloat = 320
-        let settingsHeight: CGFloat = 500
+        let settingsWidth: CGFloat = 400
+        let settingsHeight: CGFloat = 580
         
         let x = screenFrame.midX - settingsWidth / 2
         let y = screenFrame.midY - settingsHeight / 2
         
-        // Create settings window
         let window = NSWindow(
             contentRect: NSRect(x: x, y: y, width: settingsWidth, height: settingsHeight),
-            styleMask: [.titled, .closable, .fullSizeContentView],
+            styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
         
-        window.title = "Breathe Bubble Settings"
-        window.titlebarAppearsTransparent = true
-        window.titleVisibility = .hidden
-        window.isMovableByWindowBackground = true
+        window.title = "Settings"
         window.level = .floating
-        window.backgroundColor = .clear
+        window.backgroundColor = .windowBackgroundColor
         window.isReleasedWhenClosed = false
         
         let contentView = SettingsView(
             settings: settings,
             audioManager: audioManager,
+            timerManager: timerManager,
             session: isPanelOpen ? breathingSession : nil,
             onDismiss: { [weak self] in
                 self?.closeSettings()

@@ -1,6 +1,31 @@
 import SwiftUI
 import Observation
 
+// MARK: - Widget Size
+enum WidgetSize: String, CaseIterable, Identifiable {
+    case small = "Small"
+    case medium = "Medium"
+    case large = "Large"
+    
+    var id: String { rawValue }
+    
+    var dimension: CGFloat {
+        switch self {
+        case .small: return 80
+        case .medium: return 100
+        case .large: return 120
+        }
+    }
+    
+    var windowSize: CGFloat {
+        switch self {
+        case .small: return 100
+        case .medium: return 120
+        case .large: return 140
+        }
+    }
+}
+
 // MARK: - Sound Track
 struct SoundTrack: Identifiable, Equatable {
     let id: String
@@ -57,6 +82,16 @@ class AppSettings {
         }
     }
     
+    // Widget Settings
+    var widgetSize: WidgetSize = .medium {
+        didSet {
+            UserDefaults.standard.set(widgetSize.rawValue, forKey: "widgetSize")
+            onWidgetSizeChange?(widgetSize)
+        }
+    }
+    
+    var onWidgetSizeChange: ((WidgetSize) -> Void)?
+    
     // Computed
     var selectedTrack: SoundTrack {
         SoundTrack.tracks.first { $0.id == selectedTrackId } ?? SoundTrack.tracks[0]
@@ -93,6 +128,11 @@ class AppSettings {
         if defaults.object(forKey: "volume") != nil {
             volume = defaults.float(forKey: "volume")
         }
+        
+        if let sizeRaw = defaults.string(forKey: "widgetSize"),
+           let size = WidgetSize(rawValue: sizeRaw) {
+            widgetSize = size
+        }
     }
     
     // MARK: - Reset
@@ -103,6 +143,7 @@ class AppSettings {
         soundEnabled = true
         selectedTrackId = "ocean"
         volume = 0.5
+        widgetSize = .medium
     }
 }
 
