@@ -8,36 +8,32 @@
 
 /* Begin PBXBuildFile section */
 		A1B2C3D4E5F60001 /* BreatheBubbleApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60011 /* BreatheBubbleApp.swift */; };
-		A1B2C3D4E5F60002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60012 /* AppDelegate.swift */; };
 		A1B2C3D4E5F60003 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60013 /* Assets.xcassets */; };
 		A1B2C3D4E5F60004 /* BubbleShader.metal in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60014 /* BubbleShader.metal */; };
 		A1B2C3D4E5F60005 /* MetalBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60015 /* MetalBubbleView.swift */; };
 		A1B2C3D4E5F60006 /* ControlWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60016 /* ControlWidgetView.swift */; };
 		A1B2C3D4E5F60007 /* BreathingPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60017 /* BreathingPanelView.swift */; };
 		A1B2C3D4E5F60008 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60018 /* SettingsView.swift */; };
-		A1B2C3D4E5F60009 /* BreathingSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60019 /* BreathingSession.swift */; };
-		A1B2C3D4E5F6000A /* TimerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6001A /* TimerManager.swift */; };
 		A1B2C3D4E5F6000B /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6001B /* AppSettings.swift */; };
 		A1B2C3D4E5F6000C /* AudioManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6001C /* AudioManager.swift */; };
 		A1B2C3D4E5F6000D /* WindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6001D /* WindowManager.swift */; };
+		A1B2C3D4E5F6000E /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6001F /* Session.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		A1B2C3D4E5F60010 /* BreatheBubble.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BreatheBubble.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1B2C3D4E5F60011 /* BreatheBubbleApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BreatheBubbleApp.swift; sourceTree = "<group>"; };
-		A1B2C3D4E5F60012 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60013 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A1B2C3D4E5F60014 /* BubbleShader.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = BubbleShader.metal; sourceTree = "<group>"; };
 		A1B2C3D4E5F60015 /* MetalBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalBubbleView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60016 /* ControlWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlWidgetView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60017 /* BreathingPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BreathingPanelView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60018 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		A1B2C3D4E5F60019 /* BreathingSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BreathingSession.swift; sourceTree = "<group>"; };
-		A1B2C3D4E5F6001A /* TimerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerManager.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6001B /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6001C /* AudioManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioManager.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6001D /* WindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowManager.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6001E /* BreatheBubble.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BreatheBubble.entitlements; sourceTree = "<group>"; };
+		A1B2C3D4E5F6001F /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -74,7 +70,6 @@
 				A1B2C3D4E5F60034 /* Views */,
 				A1B2C3D4E5F60035 /* Shaders */,
 				A1B2C3D4E5F60036 /* Models */,
-				A1B2C3D4E5F60037 /* Audio */,
 				A1B2C3D4E5F60038 /* Utilities */,
 				A1B2C3D4E5F60039 /* Resources */,
 			);
@@ -85,7 +80,6 @@
 			isa = PBXGroup;
 			children = (
 				A1B2C3D4E5F60011 /* BreatheBubbleApp.swift */,
-				A1B2C3D4E5F60012 /* AppDelegate.swift */,
 				A1B2C3D4E5F6001E /* BreatheBubble.entitlements */,
 			);
 			path = App;
@@ -113,19 +107,11 @@
 		A1B2C3D4E5F60036 /* Models */ = {
 			isa = PBXGroup;
 			children = (
-				A1B2C3D4E5F60019 /* BreathingSession.swift */,
-				A1B2C3D4E5F6001A /* TimerManager.swift */,
 				A1B2C3D4E5F6001B /* AppSettings.swift */,
+				A1B2C3D4E5F6001C /* AudioManager.swift */,
+				A1B2C3D4E5F6001F /* Session.swift */,
 			);
 			path = Models;
-			sourceTree = "<group>";
-		};
-		A1B2C3D4E5F60037 /* Audio */ = {
-			isa = PBXGroup;
-			children = (
-				A1B2C3D4E5F6001C /* AudioManager.swift */,
-			);
-			path = Audio;
 			sourceTree = "<group>";
 		};
 		A1B2C3D4E5F60038 /* Utilities */ = {
@@ -214,17 +200,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1B2C3D4E5F60001 /* BreatheBubbleApp.swift in Sources */,
-				A1B2C3D4E5F60002 /* AppDelegate.swift in Sources */,
 				A1B2C3D4E5F60004 /* BubbleShader.metal in Sources */,
 				A1B2C3D4E5F60005 /* MetalBubbleView.swift in Sources */,
 				A1B2C3D4E5F60006 /* ControlWidgetView.swift in Sources */,
 				A1B2C3D4E5F60007 /* BreathingPanelView.swift in Sources */,
 				A1B2C3D4E5F60008 /* SettingsView.swift in Sources */,
-				A1B2C3D4E5F60009 /* BreathingSession.swift in Sources */,
-				A1B2C3D4E5F6000A /* TimerManager.swift in Sources */,
 				A1B2C3D4E5F6000B /* AppSettings.swift in Sources */,
 				A1B2C3D4E5F6000C /* AudioManager.swift in Sources */,
 				A1B2C3D4E5F6000D /* WindowManager.swift in Sources */,
+				A1B2C3D4E5F6000E /* Session.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

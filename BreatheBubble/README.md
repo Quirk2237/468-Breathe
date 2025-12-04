@@ -75,3 +75,4 @@ Place your MP3 files in the project and ensure they match the filenames in `AppS
 
 MIT License - Feel free to use and modify!
 
+

@@ -6,6 +6,7 @@ class WindowManager: ObservableObject {
     // Windows
     private var floatingBubbleWindow: NSWindow?
     private var breathingPanelWindow: NSWindow?
+    private var settingsWindow: NSWindow?
     
     // Shared state
     @Published var timerManager = TimerManager()
@@ -62,9 +63,10 @@ class WindowManager: ObservableObject {
     func showFloatingBubble() {
         if floatingBubbleWindow != nil { return }
         
-        // Create floating panel
+        // Create floating panel (120x120 to accommodate settings icon on hover)
+        let windowSize: CGFloat = 120
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 100, height: 100),
+            contentRect: NSRect(x: 0, y: 0, width: windowSize, height: windowSize),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -81,7 +83,8 @@ class WindowManager: ObservableObject {
         
         if let screen = NSScreen.main {
             let screenFrame = screen.visibleFrame
-            let x = screenFrame.maxX - widgetSize - edgePadding
+            // Position using window size (120) to properly account for settings icon area
+            let x = screenFrame.maxX - windowSize - edgePadding
             let y = screenFrame.minY + edgePadding
             panel.setFrameOrigin(NSPoint(x: x, y: y))
         }
@@ -422,6 +425,89 @@ class WindowManager: ObservableObject {
         breathingPanelWindow?.makeKeyAndOrderFront(nil)
     }
     
+    // MARK: - Settings Window
+    func openSettings() {
+        // If settings window already exists, bring it to front
+        if let existingWindow = settingsWindow {
+            existingWindow.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+        
+        // Calculate centered position
+        guard let screen = NSScreen.main else { return }
+        let screenFrame = screen.visibleFrame
+        let settingsWidth: CGFloat = 320
+        let settingsHeight: CGFloat = 500
+        
+        let x = screenFrame.midX - settingsWidth / 2
+        let y = screenFrame.midY - settingsHeight / 2
+        
+        // Create settings window
+        let window = NSWindow(
+            contentRect: NSRect(x: x, y: y, width: settingsWidth, height: settingsHeight),
+            styleMask: [.titled, .closable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        
+        window.title = "Breathe Bubble Settings"
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.isMovableByWindowBackground = true
+        window.level = .floating
+        window.backgroundColor = .clear
+        window.isReleasedWhenClosed = false
+        
+        let contentView = SettingsView(
+            settings: settings,
+            audioManager: audioManager,
+            session: isPanelOpen ? breathingSession : nil,
+            onDismiss: { [weak self] in
+                self?.closeSettings()
+            }
+        )
+        
+        let hostingView = NSHostingView(rootView: contentView)
+        hostingView.frame = window.contentView!.bounds
+        hostingView.autoresizingMask = [.width, .height]
+        
+        window.contentView = hostingView
+        
+        // Animate in
+        window.alphaValue = 0
+        window.orderFront(nil)
+        window.makeKey()
+        NSApp.activate(ignoringOtherApps: true)
+        
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.2
+            window.animator().alphaValue = 1
+        }
+        
+        settingsWindow = window
+        
+        // Watch for window close
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            self?.settingsWindow = nil
+        }
+    }
+    
+    func closeSettings() {
+        guard let window = settingsWindow else { return }
+        
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.2
+            window.animator().alphaValue = 0
+        }, completionHandler: { [weak self] in
+            window.orderOut(nil)
+            self?.settingsWindow = nil
+        })
+    }
     
     // MARK: - Quit App
     func quitApp() {

@@ -1,5 +1,7 @@
 import SwiftUI
+import AppKit
 
+// MARK: - App Entry Point
 @main
 struct BreatheBubbleApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
@@ -12,3 +14,20 @@ struct BreatheBubbleApp: App {
     }
 }
 
+// MARK: - App Delegate
+class AppDelegate: NSObject, NSApplicationDelegate {
+    var windowManager: WindowManager?
+    
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        windowManager = WindowManager()
+        windowManager?.showFloatingBubble()
+    }
+    
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        return false
+    }
+    
+    func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
+        return true
+    }
+}

@@ -5,8 +5,17 @@ struct SettingsView: View {
     @Bindable var settings: AppSettings
     var audioManager: AudioManager
     var session: BreathingSession?
+    var onDismiss: (() -> Void)?
     
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismiss) private var environmentDismiss
+    
+    private func handleDismiss() {
+        if let onDismiss = onDismiss {
+            onDismiss()
+        } else {
+            environmentDismiss()
+        }
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -18,7 +27,7 @@ struct SettingsView: View {
                 Spacer()
                 
                 Button {
-                    dismiss()
+                    handleDismiss()
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 12, weight: .semibold))
@@ -168,7 +177,7 @@ struct SettingsView: View {
                                 // Reset button
                                 Button {
                                     session.reset()
-                                    dismiss()
+                                    handleDismiss()
                                 } label: {
                                     HStack {
                                         Image(systemName: "arrow.counterclockwise")
@@ -200,7 +209,7 @@ struct SettingsView: View {
             
             // Footer
             Button {
-                dismiss()
+                handleDismiss()
             } label: {
                 Text("Done")
                     .fontWeight(.medium)

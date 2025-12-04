@@ -1,7 +1,8 @@
 import SwiftUI
 import Observation
+import UserNotifications
 
-// MARK: - Breath State Enum
+// MARK: - Breath State
 enum BreathState: String, CaseIterable {
     case idle = "IDLE"
     case inhale = "INHALE"
@@ -11,12 +12,20 @@ enum BreathState: String, CaseIterable {
     case completed = "COMPLETED"
 }
 
+// MARK: - Timer State
+enum TimerState {
+    case idle
+    case running
+    case paused
+    case completed
+}
+
 // MARK: - Phase Configuration
 struct BreathPhaseConfig {
     let label: String
-    let duration: TimeInterval // seconds
+    let duration: TimeInterval
     let instruction: String
-    let color: SIMD3<Float> // RGB 0-1 for Metal shader
+    let color: SIMD3<Float>
     
     var swiftUIColor: Color {
         Color(red: Double(color.x), green: Double(color.y), blue: Double(color.z))
@@ -35,49 +44,46 @@ let phaseConfigs: [BreathState: BreathPhaseConfig] = [
         label: "Inhale",
         duration: 4,
         instruction: "Inhale quietly through nose",
-        color: SIMD3<Float>(0.4, 0.8, 1.0) // Cyan/Blue
+        color: SIMD3<Float>(0.4, 0.8, 1.0)
     ),
     .holdFull: BreathPhaseConfig(
         label: "Hold",
         duration: 6,
         instruction: "Hold your breath",
-        color: SIMD3<Float>(0.6, 0.5, 1.0) // Purple
+        color: SIMD3<Float>(0.6, 0.5, 1.0)
     ),
     .exhale: BreathPhaseConfig(
         label: "Exhale",
         duration: 8,
         instruction: "Exhale slowly through mouth",
-        color: SIMD3<Float>(1.0, 0.4, 0.6) // Pink/Orange
+        color: SIMD3<Float>(1.0, 0.4, 0.6)
     ),
     .holdEmpty: BreathPhaseConfig(
         label: "Rest",
         duration: 4,
         instruction: "Hold empty",
-        color: SIMD3<Float>(0.2, 0.3, 0.5) // Dark Blue/Grey
+        color: SIMD3<Float>(0.2, 0.3, 0.5)
     ),
     .completed: BreathPhaseConfig(
         label: "Done",
         duration: 0,
         instruction: "Session Complete",
-        color: SIMD3<Float>(0.2, 0.8, 0.4) // Green
+        color: SIMD3<Float>(0.2, 0.8, 0.4)
     )
 ]
 
-// MARK: - Breathing Session Model
+// MARK: - Breathing Session
 @Observable
 class BreathingSession {
-    // State
     var breathState: BreathState = .idle
     var isActive: Bool = false
     var elapsedTime: TimeInterval = 0
     var cycleCount: Int = 0
     
-    // Settings
     var totalCycles: Int = 4
     var includeHoldEmpty: Bool = false
     var onComplete: (() -> Void)?
     
-    // Computed
     var currentConfig: BreathPhaseConfig {
         phaseConfigs[breathState] ?? phaseConfigs[.idle]!
     }
@@ -95,7 +101,6 @@ class BreathingSession {
         return min(elapsedTime / currentConfig.duration, 1.0)
     }
     
-    // Display link for smooth animation
     private var displayLink: CVDisplayLink?
     private var lastFrameTime: CFTimeInterval = 0
     
@@ -107,7 +112,6 @@ class BreathingSession {
         stopDisplayLink()
     }
     
-    // MARK: - Display Link Setup
     private func setupDisplayLink() {
         var displayLink: CVDisplayLink?
         CVDisplayLinkCreateWithActiveCGDisplays(&displayLink)
@@ -135,7 +139,6 @@ class BreathingSession {
         displayLink = nil
     }
     
-    // MARK: - Animation Tick
     private func tick() {
         let currentTime = CACurrentMediaTime()
         let deltaTime = lastFrameTime == 0 ? 0.016 : currentTime - lastFrameTime
@@ -145,17 +148,14 @@ class BreathingSession {
         
         elapsedTime += deltaTime
         
-        // Check phase completion
         if elapsedTime >= currentConfig.duration {
             advancePhase()
         }
     }
     
-    // MARK: - Phase Management
     private func advancePhase() {
         let nextState = nextPhase(from: breathState)
         
-        // Check for cycle completion
         if nextState == .inhale {
             cycleCount += 1
             if cycleCount >= totalCycles {
@@ -181,25 +181,21 @@ class BreathingSession {
         }
     }
     
-    // MARK: - Expansion Calculation
     private func calculateExpansion() -> Float {
         switch breathState {
         case .idle, .completed:
             return 0.1
         case .inhale:
-            // Ease out sine
             return Float(sin((progress * .pi) / 2))
         case .holdFull:
             return 1.0
         case .exhale:
-            // Ease in out
             return Float(1.0 - sin((progress * .pi) / 2))
         case .holdEmpty:
             return 0.0
         }
     }
     
-    // MARK: - Controls
     func toggle() {
         if breathState == .completed {
             reset()
@@ -232,4 +228,157 @@ class BreathingSession {
         cycleCount = 0
     }
 }
+
+// MARK: - Timer Manager
+@Observable
+class TimerManager {
+    var state: TimerState = .idle
+    var remainingSeconds: Int = 30 * 60
+    var totalSeconds: Int = 30 * 60
+    
+    var intervalMinutes: Int = 30 {
+        didSet {
+            if state == .idle {
+                totalSeconds = intervalMinutes * 60
+                remainingSeconds = totalSeconds
+            }
+        }
+    }
+    
+    var progress: Double {
+        guard totalSeconds > 0 else { return 0 }
+        return Double(totalSeconds - remainingSeconds) / Double(totalSeconds)
+    }
+    
+    var formattedTime: String {
+        let minutes = remainingSeconds / 60
+        let seconds = remainingSeconds % 60
+        return String(format: "%d:%02d", minutes, seconds)
+    }
+    
+    var formattedTimeShort: String {
+        let minutes = remainingSeconds / 60
+        if remainingSeconds < 60 {
+            return "\(remainingSeconds)s"
+        }
+        return "\(minutes)m"
+    }
+    
+    var isRunning: Bool {
+        state == .running
+    }
+    
+    private var timer: Timer?
+    var onTimerComplete: (() -> Void)?
+    
+    init() {
+        requestNotificationPermission()
+    }
+    
+    private func requestNotificationPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+            if let error = error {
+                print("Notification permission error: \(error)")
+            }
+        }
+    }
+    
+    func start() {
+        guard state != .running else { return }
+        
+        if state == .idle || state == .completed {
+            remainingSeconds = totalSeconds
+        }
+        
+        state = .running
+        startTimer()
+    }
+    
+    func pause() {
+        guard state == .running else { return }
+        state = .paused
+        stopTimer()
+    }
+    
+    func resume() {
+        guard state == .paused else { return }
+        state = .running
+        startTimer()
+    }
+    
+    func toggle() {
+        switch state {
+        case .idle, .completed:
+            start()
+        case .running:
+            pause()
+        case .paused:
+            resume()
+        }
+    }
+    
+    func reset() {
+        stopTimer()
+        state = .idle
+        remainingSeconds = totalSeconds
+    }
+    
+    func skip() {
+        stopTimer()
+        state = .completed
+        onTimerComplete?()
+    }
+    
+    private func startTimer() {
+        stopTimer()
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.tick()
+        }
+    }
+    
+    private func stopTimer() {
+        timer?.invalidate()
+        timer = nil
+    }
+    
+    private func tick() {
+        guard remainingSeconds > 0 else {
+            complete()
+            return
+        }
+        remainingSeconds -= 1
+        
+        if remainingSeconds == 0 {
+            complete()
+        }
+    }
+    
+    private func complete() {
+        stopTimer()
+        state = .completed
+        sendCompletionNotification()
+        onTimerComplete?()
+    }
+    
+    private func sendCompletionNotification() {
+        let content = UNMutableNotificationContent()
+        content.title = "Time to Breathe"
+        content.body = "Your breathing session is ready. Take a moment to relax."
+        content.sound = .default
+        
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil
+        )
+        
+        UNUserNotificationCenter.current().add(request)
+    }
+    
+    func restartAfterBreathing() {
+        reset()
+        start()
+    }
+}
+
 

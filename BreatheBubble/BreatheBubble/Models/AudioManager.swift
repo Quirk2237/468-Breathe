@@ -4,24 +4,22 @@ import Observation
 // MARK: - Audio Manager
 @Observable
 class AudioManager {
+    static let shared = AudioManager()
+    
     private var audioPlayer: AVAudioPlayer?
     private var fadeTimer: Timer?
     
     var isPlaying: Bool = false
     var currentTrackId: String?
-    
-    // Volume control
     var targetVolume: Float = 0.5
     
     // MARK: - Playback Control
     func play(track: SoundTrack, volume: Float = 0.5) {
-        // If already playing this track, just adjust volume
         if isPlaying && currentTrackId == track.id {
             setVolume(volume, fadeDuration: 0.5)
             return
         }
         
-        // Stop current playback with fade
         if isPlaying {
             fadeOut(duration: 0.5) { [weak self] in
                 self?.loadAndPlay(track: track, volume: volume)
@@ -32,7 +30,6 @@ class AudioManager {
     }
     
     private func loadAndPlay(track: SoundTrack, volume: Float) {
-        // Try to load from bundle
         guard let url = Bundle.main.url(forResource: track.filename, withExtension: "mp3") else {
             print("Audio file not found: \(track.filename).mp3")
             return
@@ -40,17 +37,15 @@ class AudioManager {
         
         do {
             audioPlayer = try AVAudioPlayer(contentsOf: url)
-            audioPlayer?.numberOfLoops = -1 // Loop indefinitely
-            audioPlayer?.volume = 0 // Start silent for fade in
+            audioPlayer?.numberOfLoops = -1
+            audioPlayer?.volume = 0
             audioPlayer?.prepareToPlay()
             audioPlayer?.play()
             
             currentTrackId = track.id
             isPlaying = true
             
-            // Fade in
             fadeIn(to: volume, duration: 2.0)
-            
         } catch {
             print("Error loading audio: \(error)")
         }
@@ -106,7 +101,6 @@ class AudioManager {
     // MARK: - Fade Effects
     private func fadeIn(to volume: Float, duration: TimeInterval) {
         targetVolume = volume
-        
         fadeTimer?.invalidate()
         
         let steps = Int(duration / 0.05)
@@ -150,8 +144,4 @@ class AudioManager {
     }
 }
 
-// MARK: - Shared Instance
-extension AudioManager {
-    static let shared = AudioManager()
-}
 

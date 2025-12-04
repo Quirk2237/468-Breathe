@@ -19,34 +19,64 @@ struct ControlWidgetView: View {
     private let ringThickness: CGFloat = 4
     
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(Color(white: 0.12))
+        ZStack(alignment: .topTrailing) {
+            // Main circle content
+            ZStack {
+                Circle()
+                    .fill(Color(white: 0.12))
+                
+                if windowManager.isPanelOpen {
+                    breathingControlContent
+                } else {
+                    timerContent
+                }
+            }
+            .frame(width: 100, height: 100)
+            .contentShape(Circle())
+            .onTapGesture {
+                handleTap()
+            }
+            .onLongPressGesture(minimumDuration: 0.5) {
+                showContextMenu = true
+            }
+            .contextMenu {
+                contextMenuContent
+            }
             
-            if windowManager.isPanelOpen {
-                breathingControlContent
-            } else {
-                timerContent
+            // Settings icon - appears on hover, positioned outside top-right
+            if isHovering {
+                settingsButton
+                    .offset(x: 8, y: -8)
+                    .transition(.scale.combined(with: .opacity))
             }
         }
-        .frame(width: 100, height: 100)
+        .frame(width: 120, height: 120) // Larger frame to accommodate settings icon
         .background(Color.clear)
-        .contentShape(Circle())
         .onHover { hovering in
-            withAnimation {
+            withAnimation(.easeInOut(duration: 0.15)) {
                 isHovering = hovering
             }
         }
-        .onTapGesture {
-            handleTap()
-        }
-        .onLongPressGesture(minimumDuration: 0.5) {
-            showContextMenu = true
-        }
-        .contextMenu {
-            contextMenuContent
-        }
         .help(windowManager.isPanelOpen ? "Click to focus breathing panel" : "Click to start/pause timer\nRight-click for options")
+    }
+    
+    // MARK: - Settings Button
+    private var settingsButton: some View {
+        Button {
+            windowManager.openSettings()
+        } label: {
+            Image(systemName: "gearshape.fill")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white.opacity(0.9))
+                .frame(width: 24, height: 24)
+                .background(
+                    Circle()
+                        .fill(Color(white: 0.2))
+                        .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .help("Open Settings")
     }
     
     // MARK: - Timer Content
@@ -63,27 +93,33 @@ struct ControlWidgetView: View {
                 .rotationEffect(.degrees(-90))
                 .animation(.linear(duration: 0.5), value: timerManager.progress)
             
-            VStack(spacing: 4) {
-                Image(systemName: "lungs.fill")
-                    .font(.system(size: 28, weight: .medium))
-                    .foregroundStyle(Color.orange)
+            // Time remaining display
+            Text(timerManager.formattedTimeShort)
+                .font(.system(size: 26, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.orange)
+                .monospacedDigit()
+            
+            // Hover overlay with play/pause
+            if isHovering {
+                Circle()
+                    .fill(Color.black.opacity(0.6))
+                    .padding(ringThickness)
                 
-                if isHovering {
-                    Image(systemName: timerManager.isRunning ? "pause.fill" : "play.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.8))
-                        .transition(.scale.combined(with: .opacity))
-                }
+                Image(systemName: timerManager.isRunning ? "pause.fill" : "play.fill")
+                    .font(.system(size: 28, weight: .medium))
+                    .foregroundStyle(.white)
+                    .transition(.opacity)
             }
-            .animation(.easeInOut(duration: 0.2), value: isHovering)
         }
+        .animation(.easeInOut(duration: 0.15), value: isHovering)
     }
     
     // MARK: - Breathing Control Content
     private var breathingControlContent: some View {
-        Image(systemName: "lungs.fill")
-            .font(.system(size: 32, weight: .medium))
+        Text(timerManager.formattedTimeShort)
+            .font(.system(size: 26, weight: .semibold, design: .rounded))
             .foregroundStyle(Color.orange)
+            .monospacedDigit()
     }
     
     // MARK: - Context Menu
@@ -155,7 +191,7 @@ struct ControlWidgetView: View {
 #Preview {
     let windowManager = WindowManager()
     return ControlWidgetView(windowManager: windowManager)
-        .frame(width: 120, height: 120)
+        .frame(width: 130, height: 130)
         .background(.black)
 }
 
