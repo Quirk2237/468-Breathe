@@ -6,7 +6,7 @@ struct ControlWidgetView: View {
     
     @State private var isHoveringWidget = false
     @State private var isHoveringCircle = false
-    @State private var showContextMenu = false
+    @Namespace private var exerciseIconNamespace
     
     private var timerManager: TimerManager {
         windowManager.timerManager
@@ -79,9 +79,6 @@ struct ControlWidgetView: View {
             }
             .onTapGesture {
                 handleTap()
-            }
-            .onLongPressGesture(minimumDuration: 0.5) {
-                showContextMenu = true
             }
             .contextMenu {
                 contextMenuContent
@@ -178,6 +175,10 @@ struct ControlWidgetView: View {
         windowManager.settings.activityPlan.getNextActivity()
     }
     
+    private var activeExercise: ActivityType? {
+        windowManager.exerciseSession.state == .active ? windowManager.exerciseSession.exerciseType : nil
+    }
+    
     private var dayActiveContent: some View {
         ZStack {
             Circle()
@@ -191,20 +192,28 @@ struct ControlWidgetView: View {
                 .rotationEffect(.degrees(-90))
                 .animation(.linear(duration: 0.5), value: timerManager.progress)
             
-            VStack(spacing: 4) {
-                Text(timerManager.formattedTimeShort)
-                    .font(.system(size: timerFontSize, weight: .semibold, design: .rounded))
-                    .foregroundStyle(ringColor)
-                    .monospacedDigit()
-                
-                if let nextExercise = nextUpExercise {
-                    Image(systemName: nextExercise.icon)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(ringColor.opacity(0.7))
+            if activeExercise == nil {
+                VStack(spacing: 8) {
+                    Text(timerManager.formattedTimeShort)
+                        .font(.system(size: timerFontSize, weight: .semibold, design: .rounded))
+                        .foregroundStyle(ringColor)
+                        .monospacedDigit()
+                    
+                    if let nextExercise = nextUpExercise {
+                        Image(systemName: nextExercise.icon)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(ringColor.opacity(0.7))
+                            .matchedGeometryEffect(id: "exerciseIcon-\(nextExercise.id)", in: exerciseIconNamespace)
+                    }
                 }
+            } else if let activeExercise = activeExercise {
+                Image(systemName: activeExercise.icon)
+                    .font(.system(size: iconFontSize, weight: .medium))
+                    .foregroundStyle(ringColor)
+                    .matchedGeometryEffect(id: "exerciseIcon-\(activeExercise.id)", in: exerciseIconNamespace)
             }
             
-            if isHoveringCircle {
+            if isHoveringCircle && activeExercise == nil {
                 Circle()
                     .fill(Color.black.opacity(0.6))
                     .padding(hoverInset)
@@ -216,6 +225,7 @@ struct ControlWidgetView: View {
             }
         }
         .animation(.easeInOut(duration: 0.15), value: isHoveringCircle)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: activeExercise?.id)
     }
     
     private var startDayContent: some View {

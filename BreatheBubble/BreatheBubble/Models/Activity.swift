@@ -2,7 +2,7 @@ import SwiftUI
 import Observation
 
 // MARK: - Activity Type
-enum ActivityType: String, CaseIterable, Identifiable, Codable {
+enum ActivityType: String, CaseIterable, Identifiable, Codable, Hashable {
     case breathwork = "breathwork"
     case pushups = "pushups"
     case situps = "situps"
@@ -25,7 +25,7 @@ enum ActivityType: String, CaseIterable, Identifiable, Codable {
         case .breathwork:
             return "wind"
         case .pushups:
-            return "figure.push"
+            return "figure.strengthtraining.traditional"
         case .situps:
             return "figure.core.training"
         }
@@ -68,6 +68,7 @@ class ActivityPlan {
     ]
     
     var activityOrder: [ActivityType] = ActivityType.allCases
+    var lastCompletedActivity: ActivityType?
     
     var enabledActivities: [ActivityType] {
         activityOrder.filter { activities[$0]?.enabled == true }
@@ -82,7 +83,25 @@ class ActivityPlan {
     func getNextActivity() -> ActivityType? {
         let enabled = enabledActivities
         guard !enabled.isEmpty else { return nil }
-        return enabled.first
+        
+        guard let lastCompleted = lastCompletedActivity else {
+            return enabled.first
+        }
+        
+        guard let lastIndex = enabled.firstIndex(of: lastCompleted) else {
+            return enabled.first
+        }
+        
+        let nextIndex = (lastIndex + 1) % enabled.count
+        return enabled[nextIndex]
+    }
+    
+    func markActivityCompleted(_ activity: ActivityType) {
+        lastCompletedActivity = activity
+    }
+    
+    func resetCompletionTracking() {
+        lastCompletedActivity = nil
     }
     
     func reorderActivities(_ newOrder: [ActivityType]) {

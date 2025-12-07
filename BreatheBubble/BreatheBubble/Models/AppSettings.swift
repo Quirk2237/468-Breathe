@@ -1,6 +1,12 @@
 import SwiftUI
 import Observation
 
+// MARK: - Day Times
+struct DayTimes: Codable {
+    var startTime: Date?
+    var endTime: Date?
+}
+
 // MARK: - Widget Size
 enum WidgetSize: String, CaseIterable, Identifiable {
     case small = "Small"
@@ -53,6 +59,13 @@ class AppSettings {
     var dailyCompletions: [String: [ActivityType: Int]] = [:] {
         didSet {
             saveDailyCompletions()
+        }
+    }
+    
+    // Daily time tracking (keyed by "YYYY-MM-DD")
+    var dailyTimes: [String: DayTimes] = [:] {
+        didSet {
+            saveDailyTimes()
         }
     }
     
@@ -109,6 +122,28 @@ class AppSettings {
         return Double(completedCount) / Double(enabledActivities.count)
     }
     
+    // MARK: - Day Times Tracking
+    func recordDayStart(for date: Date) {
+        let dateKey = dateKeyString(for: date)
+        if dailyTimes[dateKey] == nil {
+            dailyTimes[dateKey] = DayTimes()
+        }
+        dailyTimes[dateKey]?.startTime = date
+    }
+    
+    func recordDayEnd(for date: Date) {
+        let dateKey = dateKeyString(for: date)
+        if dailyTimes[dateKey] == nil {
+            dailyTimes[dateKey] = DayTimes()
+        }
+        dailyTimes[dateKey]?.endTime = date
+    }
+    
+    func getDayTimes(for date: Date) -> DayTimes? {
+        let dateKey = dateKeyString(for: date)
+        return dailyTimes[dateKey]
+    }
+    
     private func dateKeyString(for date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
@@ -134,6 +169,7 @@ class AppSettings {
         
         loadActivitySettings()
         loadDailyCompletions()
+        loadDailyTimes()
     }
     
     // MARK: - Activity Settings Persistence
@@ -243,6 +279,26 @@ class AppSettings {
         }
         
         dailyCompletions = completions
+    }
+    
+    // MARK: - Daily Times Persistence
+    private func saveDailyTimes() {
+        let defaults = UserDefaults.standard
+        
+        if let data = try? JSONEncoder().encode(dailyTimes) {
+            defaults.set(data, forKey: "dailyTimes")
+        }
+    }
+    
+    private func loadDailyTimes() {
+        let defaults = UserDefaults.standard
+        
+        guard let data = defaults.data(forKey: "dailyTimes"),
+              let times = try? JSONDecoder().decode([String: DayTimes].self, from: data) else {
+            return
+        }
+        
+        dailyTimes = times
     }
     
     // MARK: - Reset

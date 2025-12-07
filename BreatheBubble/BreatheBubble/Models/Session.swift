@@ -236,8 +236,29 @@ class TimerManager {
     var remainingSeconds: Int = 30 * 60
     var totalSeconds: Int = 30 * 60
     
-    var dayStarted: Bool = false
-    var dayStartTime: Date?
+    var dayStarted: Bool = false {
+        didSet {
+            UserDefaults.standard.set(dayStarted, forKey: "dayStarted")
+        }
+    }
+    var dayStartTime: Date? {
+        didSet {
+            if let date = dayStartTime {
+                UserDefaults.standard.set(date, forKey: "dayStartTime")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "dayStartTime")
+            }
+        }
+    }
+    var dayEndTime: Date? {
+        didSet {
+            if let date = dayEndTime {
+                UserDefaults.standard.set(date, forKey: "dayEndTime")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "dayEndTime")
+            }
+        }
+    }
     
     var isDayActive: Bool {
         dayStarted && dayStartTime != nil
@@ -281,6 +302,38 @@ class TimerManager {
     
     init() {
         requestNotificationPermission()
+        loadPersistedDayStatus()
+    }
+    
+    private func loadPersistedDayStatus() {
+        let defaults = UserDefaults.standard
+        
+        // Load persisted day started status
+        if defaults.object(forKey: "dayStarted") != nil {
+            dayStarted = defaults.bool(forKey: "dayStarted")
+        }
+        
+        // Load persisted day start time
+        if let persistedDate = defaults.object(forKey: "dayStartTime") as? Date {
+            // Check if the persisted day is still valid (same calendar day)
+            if Calendar.current.isDate(persistedDate, inSameDayAs: Date()) {
+                dayStartTime = persistedDate
+            } else {
+                // Day has changed, reset the status
+                dayStarted = false
+                dayStartTime = nil
+            }
+        }
+        
+        // Load persisted day end time
+        if let persistedEndDate = defaults.object(forKey: "dayEndTime") as? Date {
+            // Check if the persisted end time is from today
+            if Calendar.current.isDate(persistedEndDate, inSameDayAs: Date()) {
+                dayEndTime = persistedEndDate
+            } else {
+                dayEndTime = nil
+            }
+        }
     }
     
     private func requestNotificationPermission() {
@@ -309,6 +362,7 @@ class TimerManager {
     func startDay() {
         dayStarted = true
         dayStartTime = Date()
+        dayEndTime = nil
         
         if state == .idle || state == .completed {
             remainingSeconds = totalSeconds
@@ -325,8 +379,8 @@ class TimerManager {
         state = .idle
         remainingSeconds = totalSeconds
         
+        dayEndTime = Date()
         dayStarted = false
-        dayStartTime = nil
         
         onDayEnd?()
     }

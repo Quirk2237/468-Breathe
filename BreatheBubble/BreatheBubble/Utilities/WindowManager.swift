@@ -93,8 +93,10 @@ class WindowManager: ObservableObject {
     private func setupSessionCallback() {
         breathingSession.onComplete = { [weak self] in
             DispatchQueue.main.async {
-                self?.settings.recordCompletion(.breathwork, for: Date())
-                self?.closeBreathingPanel()
+                guard let self = self else { return }
+                self.settings.recordCompletion(.breathwork, for: Date())
+                self.settings.activityPlan.markActivityCompleted(.breathwork)
+                self.closeBreathingPanel()
             }
         }
     }
@@ -104,6 +106,7 @@ class WindowManager: ObservableObject {
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 self.settings.recordCompletion(self.exerciseSession.exerciseType, for: Date())
+                self.settings.activityPlan.markActivityCompleted(self.exerciseSession.exerciseType)
             }
         }
     }
@@ -177,13 +180,18 @@ class WindowManager: ObservableObject {
         let wasDayActive = timerManager.isDayActive
         timerManager.startDay()
         
+        settings.recordDayStart(for: Date())
+        
         if !wasDayActive {
             selectAndOpenActivity()
         }
     }
     
     func endDay() {
+        settings.recordDayEnd(for: Date())
+        
         timerManager.endDay()
+        settings.activityPlan.resetCompletionTracking()
     }
     
     // MARK: - Handle Widget Movement
@@ -540,7 +548,6 @@ class WindowManager: ObservableObject {
         let contentView = SettingsView(
             settings: settings,
             timerManager: timerManager,
-            session: isPanelOpen ? breathingSession : nil,
             onDismiss: { [weak self] in
                 self?.closeSettings()
             }
