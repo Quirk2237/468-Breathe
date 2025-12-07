@@ -61,6 +61,27 @@ class AppSettings {
         saveActivitySettings()
     }
     
+    func saveActivitySettings() {
+        let defaults = UserDefaults.standard
+        
+        for activity in ActivityType.allCases {
+            let config = activityPlan.getConfig(for: activity)
+            let key = "activity_\(activity.rawValue)_enabled"
+            let repKey = "activity_\(activity.rawValue)_reps"
+            
+            defaults.set(config.enabled, forKey: key)
+            defaults.set(config.repCount, forKey: repKey)
+            
+            if activity == .breathwork {
+                defaults.set(config.breathingCycles, forKey: "activity_\(activity.rawValue)_cycles")
+                defaults.set(config.includeHoldEmpty, forKey: "activity_\(activity.rawValue)_holdEmpty")
+            }
+        }
+        
+        let orderRawValues = activityPlan.activityOrder.map { $0.rawValue }
+        defaults.set(orderRawValues, forKey: "activityOrder")
+    }
+    
     // MARK: - Completion Tracking
     func recordCompletion(_ activity: ActivityType, for date: Date) {
         let dateKey = dateKeyString(for: date)
@@ -116,26 +137,19 @@ class AppSettings {
     }
     
     // MARK: - Activity Settings Persistence
-    private func saveActivitySettings() {
-        let defaults = UserDefaults.standard
-        
-        for activity in ActivityType.allCases {
-            let config = activityPlan.getConfig(for: activity)
-            let key = "activity_\(activity.rawValue)_enabled"
-            let repKey = "activity_\(activity.rawValue)_reps"
-            
-            defaults.set(config.enabled, forKey: key)
-            defaults.set(config.repCount, forKey: repKey)
-            
-            if activity == .breathwork {
-                defaults.set(config.breathingCycles, forKey: "activity_\(activity.rawValue)_cycles")
-                defaults.set(config.includeHoldEmpty, forKey: "activity_\(activity.rawValue)_holdEmpty")
-            }
-        }
-    }
     
     private func loadActivitySettings() {
         let defaults = UserDefaults.standard
+        
+        if let orderRawValues = defaults.array(forKey: "activityOrder") as? [String] {
+            let loadedOrder = orderRawValues.compactMap { ActivityType(rawValue: $0) }
+            let allActivities = Set(ActivityType.allCases)
+            let loadedSet = Set(loadedOrder)
+            let missingActivities = allActivities.subtracting(loadedSet)
+            activityPlan.activityOrder = loadedOrder + Array(missingActivities)
+        } else {
+            activityPlan.activityOrder = ActivityType.allCases
+        }
         
         for activity in ActivityType.allCases {
             let enabledKey = "activity_\(activity.rawValue)_enabled"

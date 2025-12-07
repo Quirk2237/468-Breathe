@@ -174,6 +174,10 @@ struct ControlWidgetView: View {
         }
     }
     
+    private var nextUpExercise: ActivityType? {
+        windowManager.settings.activityPlan.getNextActivity()
+    }
+    
     private var dayActiveContent: some View {
         ZStack {
             Circle()
@@ -187,10 +191,18 @@ struct ControlWidgetView: View {
                 .rotationEffect(.degrees(-90))
                 .animation(.linear(duration: 0.5), value: timerManager.progress)
             
-            Text(timerManager.formattedTimeShort)
-                .font(.system(size: timerFontSize, weight: .semibold, design: .rounded))
-                .foregroundStyle(ringColor)
-                .monospacedDigit()
+            VStack(spacing: 4) {
+                Text(timerManager.formattedTimeShort)
+                    .font(.system(size: timerFontSize, weight: .semibold, design: .rounded))
+                    .foregroundStyle(ringColor)
+                    .monospacedDigit()
+                
+                if let nextExercise = nextUpExercise {
+                    Image(systemName: nextExercise.icon)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(ringColor.opacity(0.7))
+                }
+            }
             
             if isHoveringCircle {
                 Circle()

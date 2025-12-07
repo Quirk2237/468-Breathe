@@ -68,114 +68,123 @@ struct SettingsView: View {
                                 .foregroundStyle(.secondary)
                                 .padding(.bottom, 4)
                             
-                            ForEach(ActivityType.allCases) { activity in
-                                VStack(alignment: .leading, spacing: 12) {
-                                    let config = settings.activityPlan.getConfig(for: activity)
-                                    
-                                    Toggle(isOn: Binding(
-                                        get: { config.enabled },
-                                        set: { newValue in
-                                            let updatedConfig = ActivityConfig(enabled: newValue, repCount: config.repCount)
-                                            settings.updateActivityConfig(for: activity, config: updatedConfig)
-                                        }
-                                    )) {
-                                        HStack(spacing: 8) {
-                                            Image(systemName: activity.icon)
-                                                .foregroundStyle(accentColor)
-                                                .font(.system(size: 14))
-                                            Text(activity.displayName)
-                                        }
-                                    }
-                                    .tint(accentColor)
-                                    
-                                    // Show rep count slider for exercises when enabled
-                                    if activity != .breathwork && config.enabled {
-                                        HStack {
-                                            Text("Reps")
-                                                .foregroundStyle(.secondary)
-                                                .font(.caption)
-                                            Spacer()
-                                            Text("\(config.repCount)")
-                                                .fontWeight(.medium)
-                                                .monospacedDigit()
-                                                .font(.caption)
-                                        }
+                            List {
+                                ForEach(settings.activityPlan.activityOrder, id: \.self) { activity in
+                                    VStack(alignment: .leading, spacing: 12) {
+                                        let config = settings.activityPlan.getConfig(for: activity)
                                         
-                                        Slider(
-                                            value: Binding(
-                                                get: { Double(config.repCount) },
-                                                set: { newValue in
-                                                    let updatedConfig = ActivityConfig(enabled: config.enabled, repCount: Int(newValue))
-                                                    settings.updateActivityConfig(for: activity, config: updatedConfig)
-                                                }
-                                            ),
-                                            in: 5...50,
-                                            step: 5
-                                        )
+                                        Toggle(isOn: Binding(
+                                            get: { config.enabled },
+                                            set: { newValue in
+                                                let updatedConfig = ActivityConfig(enabled: newValue, repCount: config.repCount)
+                                                settings.updateActivityConfig(for: activity, config: updatedConfig)
+                                            }
+                                        )) {
+                                            HStack(spacing: 8) {
+                                                Image(systemName: activity.icon)
+                                                    .foregroundStyle(accentColor)
+                                                    .font(.system(size: 14))
+                                                Text(activity.displayName)
+                                            }
+                                        }
                                         .tint(accentColor)
-                                    }
-                                    
-                                    // Show breathing settings for breathwork when enabled
-                                    if activity == .breathwork && config.enabled {
-                                        HStack {
-                                            Text("Cycles")
-                                                .foregroundStyle(.secondary)
-                                                .font(.caption)
-                                            Spacer()
-                                            Text("\(config.breathingCycles)")
-                                                .fontWeight(.medium)
-                                                .monospacedDigit()
-                                                .font(.caption)
+                                        
+                                        // Show rep count slider for exercises when enabled
+                                        if activity != .breathwork && config.enabled {
+                                            HStack {
+                                                Text("Reps")
+                                                    .foregroundStyle(.secondary)
+                                                    .font(.caption)
+                                                Spacer()
+                                                Text("\(config.repCount)")
+                                                    .fontWeight(.medium)
+                                                    .monospacedDigit()
+                                                    .font(.caption)
+                                            }
+                                            
+                                            Slider(
+                                                value: Binding(
+                                                    get: { Double(config.repCount) },
+                                                    set: { newValue in
+                                                        let updatedConfig = ActivityConfig(enabled: config.enabled, repCount: Int(newValue))
+                                                        settings.updateActivityConfig(for: activity, config: updatedConfig)
+                                                    }
+                                                ),
+                                                in: 5...50,
+                                                step: 5
+                                            )
+                                            .tint(accentColor)
                                         }
                                         
-                                        Slider(
-                                            value: Binding(
-                                                get: { Double(config.breathingCycles) },
+                                        // Show breathing settings for breathwork when enabled
+                                        if activity == .breathwork && config.enabled {
+                                            HStack {
+                                                Text("Cycles")
+                                                    .foregroundStyle(.secondary)
+                                                    .font(.caption)
+                                                Spacer()
+                                                Text("\(config.breathingCycles)")
+                                                    .fontWeight(.medium)
+                                                    .monospacedDigit()
+                                                    .font(.caption)
+                                            }
+                                            
+                                            Slider(
+                                                value: Binding(
+                                                    get: { Double(config.breathingCycles) },
+                                                    set: { newValue in
+                                                        let updatedConfig = ActivityConfig(
+                                                            enabled: config.enabled,
+                                                            repCount: config.repCount,
+                                                            breathingCycles: Int(newValue),
+                                                            includeHoldEmpty: config.includeHoldEmpty
+                                                        )
+                                                        settings.updateActivityConfig(for: activity, config: updatedConfig)
+                                                    }
+                                                ),
+                                                in: 1...10,
+                                                step: 1
+                                            )
+                                            .tint(accentColor)
+                                            
+                                            Divider()
+                                            
+                                            Toggle(isOn: Binding(
+                                                get: { config.includeHoldEmpty },
                                                 set: { newValue in
                                                     let updatedConfig = ActivityConfig(
                                                         enabled: config.enabled,
                                                         repCount: config.repCount,
-                                                        breathingCycles: Int(newValue),
-                                                        includeHoldEmpty: config.includeHoldEmpty
+                                                        breathingCycles: config.breathingCycles,
+                                                        includeHoldEmpty: newValue
                                                     )
                                                     settings.updateActivityConfig(for: activity, config: updatedConfig)
                                                 }
-                                            ),
-                                            in: 1...10,
-                                            step: 1
-                                        )
-                                        .tint(accentColor)
-                                        
-                                        Divider()
-                                        
-                                        Toggle(isOn: Binding(
-                                            get: { config.includeHoldEmpty },
-                                            set: { newValue in
-                                                let updatedConfig = ActivityConfig(
-                                                    enabled: config.enabled,
-                                                    repCount: config.repCount,
-                                                    breathingCycles: config.breathingCycles,
-                                                    includeHoldEmpty: newValue
-                                                )
-                                                settings.updateActivityConfig(for: activity, config: updatedConfig)
+                                            )) {
+                                                VStack(alignment: .leading, spacing: 2) {
+                                                    Text("Hold Empty")
+                                                        .font(.caption)
+                                                    Text("4s pause after exhale")
+                                                        .font(.caption2)
+                                                        .foregroundStyle(.secondary)
+                                                }
                                             }
-                                        )) {
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text("Hold Empty")
-                                                    .font(.caption)
-                                                Text("4s pause after exhale")
-                                                    .font(.caption2)
-                                                    .foregroundStyle(.secondary)
-                                            }
+                                            .tint(accentColor)
                                         }
-                                        .tint(accentColor)
                                     }
-                                    
-                                    if activity != ActivityType.allCases.last {
-                                        Divider()
-                                    }
+                                    .listRowSeparator(.hidden)
+                                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                                }
+                                .onMove { source, destination in
+                                    var newOrder = settings.activityPlan.activityOrder
+                                    newOrder.move(fromOffsets: source, toOffset: destination)
+                                    settings.activityPlan.reorderActivities(newOrder)
+                                    settings.saveActivitySettings()
                                 }
                             }
+                            .listStyle(.plain)
+                            .scrollContentBackground(.hidden)
+                            .frame(height: CGFloat(settings.activityPlan.activityOrder.count) * 80)
                         }
                     }
                     

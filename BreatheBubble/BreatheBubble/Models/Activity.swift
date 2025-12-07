@@ -25,7 +25,7 @@ enum ActivityType: String, CaseIterable, Identifiable, Codable {
         case .breathwork:
             return "wind"
         case .pushups:
-            return "figure.strengthtraining.traditional"
+            return "figure.push"
         case .situps:
             return "figure.core.training"
         }
@@ -67,14 +67,29 @@ class ActivityPlan {
         .situps: ActivityConfig(enabled: false, repCount: 10)
     ]
     
+    var activityOrder: [ActivityType] = ActivityType.allCases
+    
     var enabledActivities: [ActivityType] {
-        activities.compactMap { $0.value.enabled ? $0.key : nil }
+        activityOrder.filter { activities[$0]?.enabled == true }
     }
     
     func selectRandomActivity() -> ActivityType? {
         let enabled = enabledActivities
         guard !enabled.isEmpty else { return nil }
         return enabled.randomElement()
+    }
+    
+    func getNextActivity() -> ActivityType? {
+        let enabled = enabledActivities
+        guard !enabled.isEmpty else { return nil }
+        return enabled.first
+    }
+    
+    func reorderActivities(_ newOrder: [ActivityType]) {
+        let allActivities = Set(ActivityType.allCases)
+        let newOrderSet = Set(newOrder)
+        let missingActivities = allActivities.subtracting(newOrderSet)
+        activityOrder = newOrder + Array(missingActivities)
     }
     
     func getConfig(for activity: ActivityType) -> ActivityConfig {

@@ -110,7 +110,7 @@ class WindowManager: ObservableObject {
     
     // MARK: - Activity Selection
     private func selectAndOpenActivity() {
-        guard let selectedActivity = settings.activityPlan.selectRandomActivity() else {
+        guard let selectedActivity = settings.activityPlan.getNextActivity() else {
             timerManager.restartAfterBreathing()
             return
         }
@@ -174,7 +174,12 @@ class WindowManager: ObservableObject {
     
     // MARK: - Day Management
     func startDay() {
+        let wasDayActive = timerManager.isDayActive
         timerManager.startDay()
+        
+        if !wasDayActive {
+            selectAndOpenActivity()
+        }
     }
     
     func endDay() {
