@@ -213,7 +213,7 @@ struct ControlWidgetView: View {
                     .matchedGeometryEffect(id: "exerciseIcon-\(activeExercise.id)", in: exerciseIconNamespace)
             }
             
-            if isHoveringCircle && activeExercise == nil {
+            if (isHoveringCircle || (!timerManager.isRunning && timerManager.isDayActive)) && activeExercise == nil {
                 Circle()
                     .fill(Color.black.opacity(0.6))
                     .padding(hoverInset)
@@ -304,7 +304,7 @@ struct ControlWidgetView: View {
         Button(role: .destructive) {
             windowManager.quitApp()
         } label: {
-            Label("Quit Breathe Bubble", systemImage: "xmark.circle")
+            Label("Quit Desk Fit", systemImage: "xmark.circle")
         }
     }
     

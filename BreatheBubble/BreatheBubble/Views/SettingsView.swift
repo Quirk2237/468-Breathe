@@ -1,15 +1,63 @@
 import SwiftUI
 
+// MARK: - Activity Status Indicator
+enum ActivityStatusIndicator {
+    case active
+    case timerRunning
+    case timerPaused
+    case none
+}
+
 // MARK: - Settings View
 struct SettingsView: View {
     @Bindable var settings: AppSettings
     var timerManager: TimerManager?
+    var windowManager: WindowManager?
     var onDismiss: (() -> Void)?
     
     @Environment(\.dismiss) private var environmentDismiss
     @State private var navigationPath = NavigationPath()
     
     private let accentColor = Color(red: 53/255.0, green: 211/255.0, blue: 153/255.0)
+    
+    // MARK: - Helper Functions
+    private func getActivityStatus(activity: ActivityType, enabledIndex: Int) -> ActivityStatusIndicator {
+        guard let windowManager = windowManager else { return .none }
+        
+        // Priority 1: If exercise bubble is open for this specific enabled index
+        if windowManager.isPanelOpen,
+           let currentIndex = windowManager.currentActivityEnabledIndex,
+           currentIndex == enabledIndex {
+            return .active
+        }
+        
+        // Priority 2 & 3: Check if this is the next up activity (by index) and timer conditions
+        guard let nextIndex = settings.activityPlan.getNextActivityIndex(),
+              nextIndex == enabledIndex else {
+            return .none
+        }
+        
+        // Only show timer indicators if no bubble is open
+        guard !windowManager.isPanelOpen else {
+            return .none
+        }
+        
+        // Priority 2: Timer running
+        if let timerManager = timerManager,
+           timerManager.isDayActive,
+           timerManager.isRunning {
+            return .timerRunning
+        }
+        
+        // Priority 3: Timer paused
+        if let timerManager = timerManager,
+           timerManager.isDayActive,
+           timerManager.state == .paused {
+            return .timerPaused
+        }
+        
+        return .none
+    }
     
     private func handleDismiss() {
         if let timerManager = timerManager {
@@ -63,6 +111,44 @@ struct SettingsView: View {
                                             .background(
                                                 RoundedRectangle(cornerRadius: 8)
                                                     .stroke(settings.widgetSize == size ? Color.clear : Color.secondary.opacity(0.3), lineWidth: 1)
+                                            )
+                                            .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+                    
+                    settingsSection("Notifications") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Toggle("Play chime when exercise is ready", isOn: $settings.playChimeOnTimerComplete)
+                                .font(.system(size: 13))
+                        }
+                    }
+                    
+                    settingsSection("Exercise Bubble") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Position")
+                                .foregroundStyle(.secondary)
+                            
+                            HStack(spacing: 12) {
+                                ForEach(ExerciseBubblePosition.allCases) { position in
+                                    Button {
+                                        settings.exerciseBubblePosition = position
+                                    } label: {
+                                        Text(position.rawValue)
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundStyle(settings.exerciseBubblePosition == position ? .white : .primary)
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, 10)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .fill(settings.exerciseBubblePosition == position ? accentColor : Color.clear)
+                                            )
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .stroke(settings.exerciseBubblePosition == position ? Color.clear : Color.secondary.opacity(0.3), lineWidth: 1)
                                             )
                                             .contentShape(Rectangle())
                                     }
@@ -135,12 +221,25 @@ struct SettingsView: View {
                     .padding(.vertical, 24)
                 } else {
                     List {
-                        ForEach(settings.activityPlan.enabledActivities, id: \.self) { activity in
+                        ForEach(Array(settings.activityPlan.enabledActivities.enumerated()), id: \.offset) { index, activity in
                             ActivityRowView(
                                 activity: activity,
                                 accentColor: accentColor,
-                                onSettingsTap: {
+                                statusIndicator: getActivityStatus(activity: activity, enabledIndex: index),
+                                onEdit: {
                                     navigationPath.append(activity)
+                                },
+                                onDuplicate: {
+                                    if let orderIndex = settings.activityPlan.indexInActivityOrder(forEnabledIndex: index) {
+                                        settings.activityPlan.duplicateActivity(at: orderIndex)
+                                        settings.saveActivitySettings()
+                                    }
+                                },
+                                onDelete: {
+                                    if let orderIndex = settings.activityPlan.indexInActivityOrder(forEnabledIndex: index) {
+                                        settings.activityPlan.removeActivity(at: orderIndex)
+                                        settings.saveActivitySettings()
+                                    }
                                 }
                             )
                             .listRowSeparator(.hidden)
@@ -148,22 +247,23 @@ struct SettingsView: View {
                             .listRowBackground(Color.clear)
                         }
                         .onMove { source, destination in
-                            var enabledActivities = settings.activityPlan.enabledActivities
-                            enabledActivities.move(fromOffsets: source, toOffset: destination)
+                            let enabledActivities = settings.activityPlan.enabledActivities
+                            var reorderedEnabled = enabledActivities
+                            reorderedEnabled.move(fromOffsets: source, toOffset: destination)
                             
+                            // Rebuild activityOrder with the new enabled order, preserving disabled activities
                             var newOrder: [ActivityType] = []
-                            var remainingActivities = Set(settings.activityPlan.activityOrder)
+                            let disabledActivities = settings.activityPlan.activityOrder.filter { 
+                                settings.activityPlan.activities[$0]?.enabled != true 
+                            }
                             
-                            for activity in enabledActivities {
+                            // Add enabled activities in the new order
+                            for activity in reorderedEnabled {
                                 newOrder.append(activity)
-                                remainingActivities.remove(activity)
                             }
                             
-                            for activity in settings.activityPlan.activityOrder {
-                                if remainingActivities.contains(activity) {
-                                    newOrder.append(activity)
-                                }
-                            }
+                            // Add disabled activities at the end
+                            newOrder.append(contentsOf: disabledActivities)
                             
                             settings.activityPlan.reorderActivities(newOrder)
                             settings.saveActivitySettings()
@@ -266,9 +366,10 @@ struct CommitGridSection: View {
 struct ActivityRowView: View {
     let activity: ActivityType
     let accentColor: Color
-    let onSettingsTap: () -> Void
-    
-    @State private var isHovering = false
+    let statusIndicator: ActivityStatusIndicator
+    let onEdit: () -> Void
+    let onDuplicate: () -> Void
+    let onDelete: () -> Void
     
     var body: some View {
         HStack(spacing: 12) {
@@ -288,27 +389,48 @@ struct ActivityRowView: View {
             
             Spacer()
             
-            // Settings icon (shown on hover)
-            Button {
-                onSettingsTap()
-            } label: {
-                Image(systemName: "gearshape.fill")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+            // Status indicator
+            Group {
+                switch statusIndicator {
+                case .active:
+                    Image(systemName: "play.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(accentColor)
+                case .timerRunning:
+                    Circle()
+                        .stroke(accentColor, lineWidth: 2)
+                        .frame(width: 14, height: 14)
+                case .timerPaused:
+                    Image(systemName: "pause.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(accentColor)
+                case .none:
+                    EmptyView()
+                }
             }
-            .buttonStyle(.plain)
-            .opacity(isHovering ? 1 : 0)
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(isHovering ? accentColor.opacity(0.1) : Color.clear)
-        )
         .contentShape(Rectangle())
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isHovering = hovering
+        .contextMenu {
+            Button {
+                onDuplicate()
+            } label: {
+                Label("Duplicate", systemImage: "doc.on.doc")
+            }
+            
+            Button {
+                onEdit()
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+            
+            Divider()
+            
+            Button(role: .destructive) {
+                onDelete()
+            } label: {
+                Label("Delete", systemImage: "trash")
             }
         }
     }

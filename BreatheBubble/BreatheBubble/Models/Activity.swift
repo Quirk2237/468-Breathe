@@ -6,6 +6,7 @@ enum ActivityType: String, CaseIterable, Identifiable, Codable, Hashable {
     case breathwork = "breathwork"
     case pushups = "pushups"
     case situps = "situps"
+    case squats = "squats"
     
     var id: String { rawValue }
     
@@ -17,6 +18,8 @@ enum ActivityType: String, CaseIterable, Identifiable, Codable, Hashable {
             return "Push-ups"
         case .situps:
             return "Sit-ups"
+        case .squats:
+            return "Squats"
         }
     }
     
@@ -25,9 +28,11 @@ enum ActivityType: String, CaseIterable, Identifiable, Codable, Hashable {
         case .breathwork:
             return "wind"
         case .pushups:
-            return "figure.strengthtraining.traditional"
+            return "hand.raised.fill"
         case .situps:
-            return "figure.core.training"
+            return "arrow.up.arrow.down"
+        case .squats:
+            return "figure.walk"
         }
     }
     
@@ -38,6 +43,8 @@ enum ActivityType: String, CaseIterable, Identifiable, Codable, Hashable {
         case .pushups:
             return "Complete the reps at your own pace"
         case .situps:
+            return "Complete the reps at your own pace"
+        case .squats:
             return "Complete the reps at your own pace"
         }
     }
@@ -64,7 +71,8 @@ class ActivityPlan {
     var activities: [ActivityType: ActivityConfig] = [
         .breathwork: ActivityConfig(enabled: true, repCount: 0, breathingCycles: 4, includeHoldEmpty: false),
         .pushups: ActivityConfig(enabled: false, repCount: 10),
-        .situps: ActivityConfig(enabled: false, repCount: 10)
+        .situps: ActivityConfig(enabled: false, repCount: 10),
+        .squats: ActivityConfig(enabled: false, repCount: 10)
     ]
     
     var activityOrder: [ActivityType] = ActivityType.allCases
@@ -96,19 +104,88 @@ class ActivityPlan {
         return enabled[nextIndex]
     }
     
+    func getNextActivityIndex() -> Int? {
+        let enabled = enabledActivities
+        guard !enabled.isEmpty else { return nil }
+        
+        guard let lastCompleted = lastCompletedActivity else {
+            return 0
+        }
+        
+        guard let lastIndex = enabled.firstIndex(of: lastCompleted) else {
+            return 0
+        }
+        
+        let nextIndex = (lastIndex + 1) % enabled.count
+        return nextIndex
+    }
+    
     func markActivityCompleted(_ activity: ActivityType) {
         lastCompletedActivity = activity
+        saveLastCompletedActivity()
+    }
+    
+    func markActivitySkipped(_ activity: ActivityType) {
+        lastCompletedActivity = activity
+        saveLastCompletedActivity()
     }
     
     func resetCompletionTracking() {
         lastCompletedActivity = nil
+        saveLastCompletedActivity()
+    }
+    
+    private func saveLastCompletedActivity() {
+        let defaults = UserDefaults.standard
+        if let activity = lastCompletedActivity {
+            defaults.set(activity.rawValue, forKey: "lastCompletedActivity")
+        } else {
+            defaults.removeObject(forKey: "lastCompletedActivity")
+        }
+    }
+    
+    func loadLastCompletedActivity() {
+        let defaults = UserDefaults.standard
+        if let activityRaw = defaults.string(forKey: "lastCompletedActivity"),
+           let activity = ActivityType(rawValue: activityRaw) {
+            lastCompletedActivity = activity
+        } else {
+            lastCompletedActivity = nil
+        }
     }
     
     func reorderActivities(_ newOrder: [ActivityType]) {
-        let allActivities = Set(ActivityType.allCases)
-        let newOrderSet = Set(newOrder)
-        let missingActivities = allActivities.subtracting(newOrderSet)
-        activityOrder = newOrder + Array(missingActivities)
+        activityOrder = newOrder
+    }
+    
+    func duplicateActivity(at index: Int) {
+        guard index < activityOrder.count else { return }
+        let activityToDuplicate = activityOrder[index]
+        activityOrder.insert(activityToDuplicate, at: index + 1)
+    }
+    
+    func removeActivity(at index: Int) {
+        guard index < activityOrder.count else { return }
+        activityOrder.remove(at: index)
+    }
+    
+    func indexInActivityOrder(forEnabledIndex enabledIndex: Int) -> Int? {
+        let enabled = enabledActivities
+        guard enabledIndex >= 0 && enabledIndex < enabled.count else { return nil }
+        
+        let targetActivity = enabled[enabledIndex]
+        var enabledCount = 0
+        
+        for (orderIndex, activity) in activityOrder.enumerated() {
+            if activities[activity]?.enabled == true {
+                if enabledCount == enabledIndex {
+                    return orderIndex
+                }
+                enabledCount += 1
+            }
+        }
+        
+        return nil
     }
     
     func getConfig(for activity: ActivityType) -> ActivityConfig {

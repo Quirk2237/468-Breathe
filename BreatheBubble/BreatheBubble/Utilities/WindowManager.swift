@@ -1,11 +1,11 @@
 import SwiftUI
 import AppKit
+import QuartzCore
 
 // MARK: - Window Manager
 class WindowManager: ObservableObject {
     // Windows
     private var floatingBubbleWindow: NSWindow?
-    private var breathingPanelWindow: NSWindow?
     private var exercisePanelWindow: NSWindow?
     private var settingsWindow: NSWindow?
     
@@ -18,6 +18,7 @@ class WindowManager: ObservableObject {
     // Panel state
     @Published var isPanelOpen: Bool = false
     @Published var currentActivityType: ActivityType?
+    @Published var currentActivityEnabledIndex: Int?
     
     private var windowMoveObserver: Any?
     private var snapDebounceTimer: Timer?
@@ -113,17 +114,19 @@ class WindowManager: ObservableObject {
     
     // MARK: - Activity Selection
     private func selectAndOpenActivity() {
-        guard let selectedActivity = settings.activityPlan.getNextActivity() else {
+        guard let selectedActivity = settings.activityPlan.getNextActivity(),
+              let selectedIndex = settings.activityPlan.getNextActivityIndex() else {
             timerManager.restartAfterBreathing()
             return
         }
         
         currentActivityType = selectedActivity
+        currentActivityEnabledIndex = selectedIndex
         
         switch selectedActivity {
         case .breathwork:
             openBreathingPanel()
-        case .pushups, .situps:
+        case .pushups, .situps, .squats:
             openExercisePanel(for: selectedActivity)
         }
     }
@@ -281,7 +284,7 @@ class WindowManager: ObservableObject {
     
     private func snapWidgetToOrbitPosition() {
         guard let widgetWindow = floatingBubbleWindow,
-              let panelWindow = breathingPanelWindow else { return }
+              let panelWindow = exercisePanelWindow else { return }
         
         let widgetFrame = widgetWindow.frame
         let panelFrame = panelWindow.frame
@@ -368,7 +371,7 @@ class WindowManager: ObservableObject {
         panel.hidesOnDeactivate = false
         panel.isMovableByWindowBackground = true
         
-        let contentView = BreathingPanelView(windowManager: self)
+        let contentView = ExerciseBubble(windowManager: self)
         let hostingView = NSHostingView(rootView: contentView)
         hostingView.frame = panel.contentView!.bounds
         hostingView.autoresizingMask = [.width, .height]
@@ -378,15 +381,35 @@ class WindowManager: ObservableObject {
         panel.contentView = hostingView
         
         panel.alphaValue = 0
+        hostingView.layer?.transform = CATransform3DMakeScale(0.8, 0.8, 1.0)
         panel.orderFront(nil)
         
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.3
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.4
+            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.16, 1.0, 0.3, 1.0)
             panel.animator().alphaValue = 1
-        }
+            
+            if let layer = hostingView.layer {
+                let animation = CABasicAnimation(keyPath: "transform")
+                animation.fromValue = CATransform3DMakeScale(0.8, 0.8, 1.0)
+                animation.toValue = CATransform3DIdentity
+                animation.duration = 0.4
+                animation.timingFunction = CAMediaTimingFunction(controlPoints: 0.16, 1.0, 0.3, 1.0)
+                layer.add(animation, forKey: "transform")
+                layer.transform = CATransform3DIdentity
+            }
+        })
         
-        breathingPanelWindow = panel
+        exercisePanelWindow = panel
         isPanelOpen = true
+        currentActivityType = .breathwork
+        
+        // The enabled index should already be set by selectAndOpenActivity
+        // If not set (e.g., if called directly), find the first occurrence
+        if currentActivityEnabledIndex == nil {
+            let enabledActivities = settings.activityPlan.enabledActivities
+            currentActivityEnabledIndex = enabledActivities.firstIndex(of: .breathwork)
+        }
         
         let breathworkConfig = settings.activityPlan.getConfig(for: .breathwork)
         breathingSession.totalCycles = breathworkConfig.breathingCycles
@@ -401,36 +424,63 @@ class WindowManager: ObservableObject {
         }
         
         let screenFrame = screen.visibleFrame
-        let gap: CGFloat = 20
         
-        var panelX = widgetFrame.midX - panelSize / 2
-        var panelY = widgetFrame.maxY + gap
-        
-        panelX = max(screenFrame.minX + edgePadding, min(panelX, screenFrame.maxX - panelSize - edgePadding))
-        
-        if panelY + panelSize > screenFrame.maxY - edgePadding {
-            panelY = widgetFrame.minY - panelSize - gap
+        switch settings.exerciseBubblePosition {
+        case .center:
+            let centerX = screenFrame.midX - panelSize / 2
+            let centerY = screenFrame.midY - panelSize / 2
+            return NSPoint(x: centerX, y: centerY)
+            
+        case .nextToWidget:
+            let gap: CGFloat = 20
+            
+            var panelX = widgetFrame.midX - panelSize / 2
+            var panelY = widgetFrame.maxY + gap
+            
+            panelX = max(screenFrame.minX + edgePadding, min(panelX, screenFrame.maxX - panelSize - edgePadding))
+            
+            if panelY + panelSize > screenFrame.maxY - edgePadding {
+                panelY = widgetFrame.minY - panelSize - gap
+            }
+            panelY = max(screenFrame.minY + edgePadding, min(panelY, screenFrame.maxY - panelSize - edgePadding))
+            
+            return NSPoint(x: panelX, y: panelY)
         }
-        panelY = max(screenFrame.minY + edgePadding, min(panelY, screenFrame.maxY - panelSize - edgePadding))
+    }
+    
+    private func closePanelWithAnimation() {
+        guard let panel = exercisePanelWindow else { return }
+        guard let hostingView = panel.contentView as? NSHostingView<ExerciseBubble> else { return }
         
-        return NSPoint(x: panelX, y: panelY)
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.3
+            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.16, 1.0, 0.3, 1.0)
+            panel.animator().alphaValue = 0
+            
+            if let layer = hostingView.layer {
+                let animation = CABasicAnimation(keyPath: "transform")
+                animation.fromValue = layer.transform
+                animation.toValue = CATransform3DMakeScale(0.8, 0.8, 1.0)
+                animation.duration = 0.3
+                animation.timingFunction = CAMediaTimingFunction(controlPoints: 0.16, 1.0, 0.3, 1.0)
+                layer.add(animation, forKey: "transform")
+                layer.transform = CATransform3DMakeScale(0.8, 0.8, 1.0)
+            }
+        }, completionHandler: { [weak self] in
+            panel.orderOut(nil)
+            self?.exercisePanelWindow = nil
+            self?.isPanelOpen = false
+            self?.currentActivityType = nil
+            self?.currentActivityEnabledIndex = nil
+            self?.timerManager.restartAfterBreathing()
+        })
     }
     
     func closeBreathingPanel() {
-        guard let panel = breathingPanelWindow else { return }
+        guard exercisePanelWindow != nil else { return }
         
         breathingSession.reset()
-        
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.2
-            panel.animator().alphaValue = 0
-        }, completionHandler: { [weak self] in
-            panel.orderOut(nil)
-            self?.breathingPanelWindow = nil
-            self?.isPanelOpen = false
-            self?.currentActivityType = nil
-            self?.timerManager.restartAfterBreathing()
-        })
+        closePanelWithAnimation()
     }
     
     // MARK: - Exercise Panel Window
@@ -459,7 +509,7 @@ class WindowManager: ObservableObject {
         panel.hidesOnDeactivate = false
         panel.isMovableByWindowBackground = true
         
-        let contentView = ExercisePanelView(windowManager: self)
+        let contentView = ExerciseBubble(windowManager: self)
         let hostingView = NSHostingView(rootView: contentView)
         hostingView.frame = panel.contentView!.bounds
         hostingView.autoresizingMask = [.width, .height]
@@ -469,43 +519,66 @@ class WindowManager: ObservableObject {
         panel.contentView = hostingView
         
         panel.alphaValue = 0
+        hostingView.layer?.transform = CATransform3DMakeScale(0.8, 0.8, 1.0)
         panel.orderFront(nil)
         
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.3
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.4
+            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.16, 1.0, 0.3, 1.0)
             panel.animator().alphaValue = 1
-        }
+            
+            if let layer = hostingView.layer {
+                let animation = CABasicAnimation(keyPath: "transform")
+                animation.fromValue = CATransform3DMakeScale(0.8, 0.8, 1.0)
+                animation.toValue = CATransform3DIdentity
+                animation.duration = 0.4
+                animation.timingFunction = CAMediaTimingFunction(controlPoints: 0.16, 1.0, 0.3, 1.0)
+                layer.add(animation, forKey: "transform")
+                layer.transform = CATransform3DIdentity
+            }
+        })
         
         exercisePanelWindow = panel
         isPanelOpen = true
+        currentActivityType = activity
+        
+        // The enabled index should already be set by selectAndOpenActivity
+        // If not set (e.g., if called directly), find the first occurrence
+        if currentActivityEnabledIndex == nil {
+            let enabledActivities = settings.activityPlan.enabledActivities
+            currentActivityEnabledIndex = enabledActivities.firstIndex(of: activity)
+        }
         
         timerManager.pause()
     }
     
     func closeExercisePanel() {
-        guard let panel = exercisePanelWindow else { return }
+        guard exercisePanelWindow != nil else { return }
         
         exerciseSession.reset()
+        closePanelWithAnimation()
+    }
+    
+    func skipExercise() {
+        guard exercisePanelWindow != nil else { return }
         
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.2
-            panel.animator().alphaValue = 0
-        }, completionHandler: { [weak self] in
-            panel.orderOut(nil)
-            self?.exercisePanelWindow = nil
-            self?.isPanelOpen = false
-            self?.currentActivityType = nil
-            self?.timerManager.restartAfterBreathing()
-        })
+        if let currentActivity = currentActivityType {
+            settings.activityPlan.markActivitySkipped(currentActivity)
+        }
+        
+        exerciseSession.reset()
+        closePanelWithAnimation()
     }
     
     // MARK: - Toggle Panel
     func toggleBreathingPanel() {
         if isPanelOpen {
-            if breathingPanelWindow != nil {
-                closeBreathingPanel()
-            } else if exercisePanelWindow != nil {
-                closeExercisePanel()
+            if exercisePanelWindow != nil {
+                if currentActivityType == .breathwork {
+                    closeBreathingPanel()
+                } else {
+                    closeExercisePanel()
+                }
             }
         } else {
             openBreathingPanel()
@@ -514,7 +587,7 @@ class WindowManager: ObservableObject {
     
     // MARK: - Focus Breathing Panel
     func focusBreathingPanel() {
-        breathingPanelWindow?.makeKeyAndOrderFront(nil)
+        exercisePanelWindow?.makeKeyAndOrderFront(nil)
     }
     
     // MARK: - Settings Window
@@ -548,6 +621,7 @@ class WindowManager: ObservableObject {
         let contentView = SettingsView(
             settings: settings,
             timerManager: timerManager,
+            windowManager: self,
             onDismiss: { [weak self] in
                 self?.closeSettings()
             }

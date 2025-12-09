@@ -12,16 +12,16 @@
 		A1B2C3D4E5F60004 /* BubbleShader.metal in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60014 /* BubbleShader.metal */; };
 		A1B2C3D4E5F60005 /* MetalBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60015 /* MetalBubbleView.swift */; };
 		A1B2C3D4E5F60006 /* ControlWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60016 /* ControlWidgetView.swift */; };
-		A1B2C3D4E5F60007 /* BreathingPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60017 /* BreathingPanelView.swift */; };
 		A1B2C3D4E5F60008 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60018 /* SettingsView.swift */; };
 		A1B2C3D4E5F6000A /* CommitGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6001A /* CommitGrid.swift */; };
 		A1B2C3D4E5F6000B /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6001B /* AppSettings.swift */; };
 		A1B2C3D4E5F6000D /* WindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6001D /* WindowManager.swift */; };
 		A1B2C3D4E5F6000E /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6001F /* Session.swift */; };
 		A1B2C3D4E5F6000F /* Activity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60021 /* Activity.swift */; };
-		A1B2C3D4E5F60009 /* ExercisePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60019 /* ExercisePanelView.swift */; };
 		A1B2C3D4E5F60023 /* ActivitySelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60022 /* ActivitySelectionView.swift */; };
 		A1B2C3D4E5F60025 /* ActivitySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60024 /* ActivitySettingsView.swift */; };
+		A1B2C3D4E5F60026 /* CircularActionButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60027 /* CircularActionButton.swift */; };
+		A1B2C3D4E5F60028 /* ExerciseBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60029 /* ExerciseBubble.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -31,17 +31,17 @@
 		A1B2C3D4E5F60014 /* BubbleShader.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = BubbleShader.metal; sourceTree = "<group>"; };
 		A1B2C3D4E5F60015 /* MetalBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalBubbleView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60016 /* ControlWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlWidgetView.swift; sourceTree = "<group>"; };
-		A1B2C3D4E5F60017 /* BreathingPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BreathingPanelView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60018 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6001A /* CommitGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommitGrid.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6001B /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6001D /* WindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowManager.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6001E /* BreatheBubble.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BreatheBubble.entitlements; sourceTree = "<group>"; };
 		A1B2C3D4E5F6001F /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
-		A1B2C3D4E5F60019 /* ExercisePanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExercisePanelView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60021 /* Activity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Activity.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60022 /* ActivitySelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivitySelectionView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60024 /* ActivitySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivitySettingsView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60027 /* CircularActionButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircularActionButton.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60029 /* ExerciseBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseBubble.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -97,12 +97,12 @@
 			isa = PBXGroup;
 			children = (
 				A1B2C3D4E5F60016 /* ControlWidgetView.swift */,
-				A1B2C3D4E5F60017 /* BreathingPanelView.swift */,
 				A1B2C3D4E5F60018 /* SettingsView.swift */,
-				A1B2C3D4E5F60019 /* ExercisePanelView.swift */,
 				A1B2C3D4E5F6001A /* CommitGrid.swift */,
 				A1B2C3D4E5F60022 /* ActivitySelectionView.swift */,
 				A1B2C3D4E5F60024 /* ActivitySettingsView.swift */,
+				A1B2C3D4E5F60027 /* CircularActionButton.swift */,
+				A1B2C3D4E5F60029 /* ExerciseBubble.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -215,9 +215,7 @@
 				A1B2C3D4E5F60004 /* BubbleShader.metal in Sources */,
 				A1B2C3D4E5F60005 /* MetalBubbleView.swift in Sources */,
 				A1B2C3D4E5F60006 /* ControlWidgetView.swift in Sources */,
-				A1B2C3D4E5F60007 /* BreathingPanelView.swift in Sources */,
 				A1B2C3D4E5F60008 /* SettingsView.swift in Sources */,
-				A1B2C3D4E5F60009 /* ExercisePanelView.swift in Sources */,
 				A1B2C3D4E5F6000A /* CommitGrid.swift in Sources */,
 				A1B2C3D4E5F6000B /* AppSettings.swift in Sources */,
 				A1B2C3D4E5F6000D /* WindowManager.swift in Sources */,
@@ -225,6 +223,8 @@
 				A1B2C3D4E5F6000F /* Activity.swift in Sources */,
 				A1B2C3D4E5F60023 /* ActivitySelectionView.swift in Sources */,
 				A1B2C3D4E5F60025 /* ActivitySettingsView.swift in Sources */,
+				A1B2C3D4E5F60026 /* CircularActionButton.swift in Sources */,
+				A1B2C3D4E5F60028 /* ExerciseBubble.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

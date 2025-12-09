@@ -32,6 +32,14 @@ enum WidgetSize: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Exercise Bubble Position
+enum ExerciseBubblePosition: String, CaseIterable, Identifiable {
+    case nextToWidget = "Next to Widget"
+    case center = "Center of Screen"
+    
+    var id: String { rawValue }
+}
+
 // MARK: - App Settings
 @Observable
 class AppSettings {
@@ -52,6 +60,20 @@ class AppSettings {
     
     var onWidgetSizeChange: ((WidgetSize) -> Void)?
     
+    // Exercise Bubble Settings
+    var exerciseBubblePosition: ExerciseBubblePosition = .nextToWidget {
+        didSet {
+            UserDefaults.standard.set(exerciseBubblePosition.rawValue, forKey: "exerciseBubblePosition")
+        }
+    }
+    
+    // Notification Settings
+    var playChimeOnTimerComplete: Bool = false {
+        didSet {
+            UserDefaults.standard.set(playChimeOnTimerComplete, forKey: "playChimeOnTimerComplete")
+        }
+    }
+    
     // Activity Settings
     var activityPlan = ActivityPlan()
     
@@ -70,7 +92,15 @@ class AppSettings {
     }
     
     func updateActivityConfig(for activity: ActivityType, config: ActivityConfig) {
+        let wasEnabled = activityPlan.activities[activity]?.enabled ?? false
         activityPlan.updateConfig(for: activity, config: config)
+        
+        if !config.enabled && wasEnabled {
+            activityPlan.activityOrder.removeAll { $0 == activity }
+        } else if config.enabled && !wasEnabled && !activityPlan.activityOrder.contains(activity) {
+            activityPlan.activityOrder.append(activity)
+        }
+        
         saveActivitySettings()
     }
     
@@ -167,6 +197,15 @@ class AppSettings {
             widgetSize = size
         }
         
+        if let positionRaw = defaults.string(forKey: "exerciseBubblePosition"),
+           let position = ExerciseBubblePosition(rawValue: positionRaw) {
+            exerciseBubblePosition = position
+        }
+        
+        if defaults.object(forKey: "playChimeOnTimerComplete") != nil {
+            playChimeOnTimerComplete = defaults.bool(forKey: "playChimeOnTimerComplete")
+        }
+        
         loadActivitySettings()
         loadDailyCompletions()
         loadDailyTimes()
@@ -179,10 +218,7 @@ class AppSettings {
         
         if let orderRawValues = defaults.array(forKey: "activityOrder") as? [String] {
             let loadedOrder = orderRawValues.compactMap { ActivityType(rawValue: $0) }
-            let allActivities = Set(ActivityType.allCases)
-            let loadedSet = Set(loadedOrder)
-            let missingActivities = allActivities.subtracting(loadedSet)
-            activityPlan.activityOrder = loadedOrder + Array(missingActivities)
+            activityPlan.activityOrder = loadedOrder.isEmpty ? ActivityType.allCases : loadedOrder
         } else {
             activityPlan.activityOrder = ActivityType.allCases
         }
@@ -239,6 +275,9 @@ class AppSettings {
                 activityPlan.updateConfig(for: activity, config: ActivityConfig(enabled: enabled, repCount: repCount))
             }
         }
+        
+        // Load last completed activity
+        activityPlan.loadLastCompletedActivity()
     }
     
     // MARK: - Daily Completions Persistence
@@ -305,11 +344,14 @@ class AppSettings {
     func resetToDefaults() {
         timerIntervalMinutes = 30
         widgetSize = .medium
+        exerciseBubblePosition = .nextToWidget
+        playChimeOnTimerComplete = false
         
         activityPlan = ActivityPlan()
         activityPlan.updateConfig(for: .breathwork, config: ActivityConfig(enabled: true, repCount: 0, breathingCycles: 4, includeHoldEmpty: false))
         activityPlan.updateConfig(for: .pushups, config: ActivityConfig(enabled: false, repCount: 10))
         activityPlan.updateConfig(for: .situps, config: ActivityConfig(enabled: false, repCount: 10))
+        activityPlan.updateConfig(for: .squats, config: ActivityConfig(enabled: false, repCount: 10))
         saveActivitySettings()
     }
 }

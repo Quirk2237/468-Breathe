@@ -1,4 +1,4 @@
-# Breathe Bubble
+# Desk Fit
 
 A beautiful, floating breathing exercise app for macOS. Features a 4-6-8 breathing technique with a stunning shader-based bubble visualization.
 
@@ -38,7 +38,8 @@ BreatheBubble/
 │   └── BreatheBubble.entitlements # Sandbox permissions
 ├── Views/
 │   ├── FloatingBubbleView.swift   # Small timer bubble
-│   ├── BreathingPanelView.swift   # Main breathing UI
+│   ├── ExerciseBubble.swift        # Unified exercise panel (breathwork & exercises)
+│   ├── CircularActionButton.swift  # Reusable circular button component
 │   └── SettingsView.swift         # Settings panel
 ├── Shaders/
 │   ├── BubbleShader.metal         # Metal shader (converted from WebGL)
@@ -74,5 +75,8 @@ Place your MP3 files in the project and ensure they match the filenames in `AppS
 ## License
 
 MIT License - Feel free to use and modify!
+
+
+
 
 

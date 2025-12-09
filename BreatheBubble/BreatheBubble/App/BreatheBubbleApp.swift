@@ -3,7 +3,7 @@ import AppKit
 
 // MARK: - App Entry Point
 @main
-struct BreatheBubbleApp: App {
+struct DeskFitApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
     var body: some Scene {
@@ -29,5 +29,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
         return true
+    }
+    
+    func applicationWillTerminate(_ notification: Notification) {
+        // Ensure timer state is saved before app quits
+        windowManager?.timerManager.saveTimerState()
     }
 }
