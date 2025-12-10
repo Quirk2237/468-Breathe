@@ -97,11 +97,23 @@ class AppSettings {
         
         if !config.enabled && wasEnabled {
             activityPlan.activityOrder.removeAll { $0 == activity }
+            adjustNextUpIndexAfterDisabling(activity)
         } else if config.enabled && !wasEnabled && !activityPlan.activityOrder.contains(activity) {
             activityPlan.activityOrder.append(activity)
         }
         
         saveActivitySettings()
+    }
+    
+    private func adjustNextUpIndexAfterDisabling(_ activity: ActivityType) {
+        guard let currentNextIndex = activityPlan.nextUpEnabledIndex else { return }
+        
+        let enabled = activityPlan.enabledActivities
+        if currentNextIndex < enabled.count && enabled[currentNextIndex] == activity {
+            activityPlan.nextUpEnabledIndex = nil
+        } else if currentNextIndex >= enabled.count {
+            activityPlan.nextUpEnabledIndex = nil
+        }
     }
     
     func saveActivitySettings() {
@@ -123,6 +135,12 @@ class AppSettings {
         
         let orderRawValues = activityPlan.activityOrder.map { $0.rawValue }
         defaults.set(orderRawValues, forKey: "activityOrder")
+        
+        if let nextUpIndex = activityPlan.nextUpEnabledIndex {
+            defaults.set(nextUpIndex, forKey: "nextUpEnabledIndex")
+        } else {
+            defaults.removeObject(forKey: "nextUpEnabledIndex")
+        }
     }
     
     // MARK: - Completion Tracking
@@ -223,6 +241,13 @@ class AppSettings {
             activityPlan.activityOrder = ActivityType.allCases
         }
         
+        if defaults.object(forKey: "nextUpEnabledIndex") != nil {
+            let nextUpIndex = defaults.integer(forKey: "nextUpEnabledIndex")
+            activityPlan.nextUpEnabledIndex = nextUpIndex < activityPlan.enabledActivities.count ? nextUpIndex : nil
+        } else {
+            activityPlan.nextUpEnabledIndex = nil
+        }
+        
         for activity in ActivityType.allCases {
             let enabledKey = "activity_\(activity.rawValue)_enabled"
             let repKey = "activity_\(activity.rawValue)_reps"
@@ -275,9 +300,6 @@ class AppSettings {
                 activityPlan.updateConfig(for: activity, config: ActivityConfig(enabled: enabled, repCount: repCount))
             }
         }
-        
-        // Load last completed activity
-        activityPlan.loadLastCompletedActivity()
     }
     
     // MARK: - Daily Completions Persistence
@@ -348,6 +370,7 @@ class AppSettings {
         playChimeOnTimerComplete = false
         
         activityPlan = ActivityPlan()
+        activityPlan.nextUpEnabledIndex = nil
         activityPlan.updateConfig(for: .breathwork, config: ActivityConfig(enabled: true, repCount: 0, breathingCycles: 4, includeHoldEmpty: false))
         activityPlan.updateConfig(for: .pushups, config: ActivityConfig(enabled: false, repCount: 10))
         activityPlan.updateConfig(for: .situps, config: ActivityConfig(enabled: false, repCount: 10))

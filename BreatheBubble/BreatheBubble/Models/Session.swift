@@ -14,7 +14,7 @@ enum BreathState: String, CaseIterable {
 }
 
 // MARK: - Timer State
-enum TimerState: String, Codable {
+enum TimerState {
     case idle
     case running
     case paused
@@ -267,12 +267,10 @@ class TimerManager {
     
     var intervalMinutes: Int = 30 {
         didSet {
-            UserDefaults.standard.set(intervalMinutes, forKey: "timerIntervalMinutes")
             if state == .idle {
                 totalSeconds = intervalMinutes * 60
                 remainingSeconds = totalSeconds
             }
-            saveTimerState()
         }
     }
     
@@ -306,7 +304,6 @@ class TimerManager {
     init() {
         requestNotificationPermission()
         loadPersistedDayStatus()
-        loadTimerState()
     }
     
     private func loadPersistedDayStatus() {
@@ -326,8 +323,6 @@ class TimerManager {
                 // Day has changed, reset the status
                 dayStarted = false
                 dayStartTime = nil
-                // Clear timer state when day changes
-                clearTimerState()
             }
         }
         
@@ -340,61 +335,6 @@ class TimerManager {
                 dayEndTime = nil
             }
         }
-    }
-    
-    func saveTimerState() {
-        let defaults = UserDefaults.standard
-        defaults.set(state.rawValue, forKey: "timerState")
-        defaults.set(remainingSeconds, forKey: "timerRemainingSeconds")
-        defaults.set(totalSeconds, forKey: "timerTotalSeconds")
-    }
-    
-    private func loadTimerState() {
-        let defaults = UserDefaults.standard
-        
-        // Check if day has changed - if so, reset timer state
-        if let persistedDate = defaults.object(forKey: "dayStartTime") as? Date {
-            if !Calendar.current.isDate(persistedDate, inSameDayAs: Date()) {
-                // Day has changed, don't load timer state
-                clearTimerState()
-                return
-            }
-        }
-        
-        // Load interval minutes first (if exists)
-        if defaults.object(forKey: "timerIntervalMinutes") != nil {
-            intervalMinutes = defaults.integer(forKey: "timerIntervalMinutes")
-        }
-        
-        // Load timer state
-        if let stateRaw = defaults.string(forKey: "timerState"),
-           let loadedState = TimerState(rawValue: stateRaw) {
-            state = loadedState
-        }
-        
-        // Load remaining seconds
-        if defaults.object(forKey: "timerRemainingSeconds") != nil {
-            remainingSeconds = defaults.integer(forKey: "timerRemainingSeconds")
-        }
-        
-        // Load total seconds
-        if defaults.object(forKey: "timerTotalSeconds") != nil {
-            totalSeconds = defaults.integer(forKey: "timerTotalSeconds")
-        }
-        
-        // If timer was running, restore it to paused state (since app was closed)
-        if state == .running {
-            state = .paused
-        }
-    }
-    
-    private func clearTimerState() {
-        let defaults = UserDefaults.standard
-        defaults.removeObject(forKey: "timerState")
-        defaults.removeObject(forKey: "timerRemainingSeconds")
-        defaults.removeObject(forKey: "timerTotalSeconds")
-        state = .idle
-        remainingSeconds = totalSeconds
     }
     
     private func requestNotificationPermission() {
@@ -418,7 +358,6 @@ class TimerManager {
         
         state = .running
         startTimer()
-        saveTimerState()
     }
     
     func startDay() {
@@ -434,7 +373,6 @@ class TimerManager {
             state = .running
             startTimer()
         }
-        saveTimerState()
     }
     
     func endDay() {
@@ -445,7 +383,6 @@ class TimerManager {
         dayEndTime = Date()
         dayStarted = false
         
-        clearTimerState()
         onDayEnd?()
     }
     
@@ -453,14 +390,12 @@ class TimerManager {
         guard state == .running else { return }
         state = .paused
         stopTimer()
-        saveTimerState()
     }
     
     func resume() {
         guard state == .paused else { return }
         state = .running
         startTimer()
-        saveTimerState()
     }
     
     func toggle() {
@@ -478,13 +413,11 @@ class TimerManager {
         stopTimer()
         state = .idle
         remainingSeconds = totalSeconds
-        saveTimerState()
     }
     
     func skip() {
         stopTimer()
         state = .completed
-        saveTimerState()
         onTimerComplete?()
     }
     
@@ -506,7 +439,6 @@ class TimerManager {
             return
         }
         remainingSeconds -= 1
-        saveTimerState()
         
         if remainingSeconds == 0 {
             complete()
@@ -516,7 +448,6 @@ class TimerManager {
     private func complete() {
         stopTimer()
         state = .completed
-        saveTimerState()
         sendCompletionNotification()
         
         if AppSettings.shared.playChimeOnTimerComplete {
@@ -606,5 +537,3 @@ class ExerciseSession {
         state = .idle
     }
 }
-
-

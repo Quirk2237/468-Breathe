@@ -76,7 +76,8 @@ class ActivityPlan {
     ]
     
     var activityOrder: [ActivityType] = ActivityType.allCases
-    var lastCompletedActivity: ActivityType?
+    var lastCompletedEnabledIndex: Int?
+    var nextUpEnabledIndex: Int?
     
     var enabledActivities: [ActivityType] {
         activityOrder.filter { activities[$0]?.enabled == true }
@@ -92,11 +93,13 @@ class ActivityPlan {
         let enabled = enabledActivities
         guard !enabled.isEmpty else { return nil }
         
-        guard let lastCompleted = lastCompletedActivity else {
-            return enabled.first
+        if let manualIndex = nextUpEnabledIndex,
+           manualIndex < enabled.count {
+            return enabled[manualIndex]
         }
         
-        guard let lastIndex = enabled.firstIndex(of: lastCompleted) else {
+        guard let lastIndex = lastCompletedEnabledIndex,
+              lastIndex < enabled.count else {
             return enabled.first
         }
         
@@ -108,11 +111,13 @@ class ActivityPlan {
         let enabled = enabledActivities
         guard !enabled.isEmpty else { return nil }
         
-        guard let lastCompleted = lastCompletedActivity else {
-            return 0
+        if let manualIndex = nextUpEnabledIndex,
+           manualIndex < enabled.count {
+            return manualIndex
         }
         
-        guard let lastIndex = enabled.firstIndex(of: lastCompleted) else {
+        guard let lastIndex = lastCompletedEnabledIndex,
+              lastIndex < enabled.count else {
             return 0
         }
         
@@ -121,37 +126,25 @@ class ActivityPlan {
     }
     
     func markActivityCompleted(_ activity: ActivityType) {
-        lastCompletedActivity = activity
-        saveLastCompletedActivity()
+        if let index = enabledActivities.firstIndex(of: activity) {
+            lastCompletedEnabledIndex = index
+            if nextUpEnabledIndex == index {
+                nextUpEnabledIndex = nil
+            }
+        } else {
+            lastCompletedEnabledIndex = nil
+        }
     }
     
     func markActivitySkipped(_ activity: ActivityType) {
-        lastCompletedActivity = activity
-        saveLastCompletedActivity()
+        if let index = enabledActivities.firstIndex(of: activity),
+           nextUpEnabledIndex == index {
+            nextUpEnabledIndex = nil
+        }
     }
     
     func resetCompletionTracking() {
-        lastCompletedActivity = nil
-        saveLastCompletedActivity()
-    }
-    
-    private func saveLastCompletedActivity() {
-        let defaults = UserDefaults.standard
-        if let activity = lastCompletedActivity {
-            defaults.set(activity.rawValue, forKey: "lastCompletedActivity")
-        } else {
-            defaults.removeObject(forKey: "lastCompletedActivity")
-        }
-    }
-    
-    func loadLastCompletedActivity() {
-        let defaults = UserDefaults.standard
-        if let activityRaw = defaults.string(forKey: "lastCompletedActivity"),
-           let activity = ActivityType(rawValue: activityRaw) {
-            lastCompletedActivity = activity
-        } else {
-            lastCompletedActivity = nil
-        }
+        lastCompletedEnabledIndex = nil
     }
     
     func reorderActivities(_ newOrder: [ActivityType]) {
@@ -171,7 +164,7 @@ class ActivityPlan {
     
     func indexInActivityOrder(forEnabledIndex enabledIndex: Int) -> Int? {
         let enabled = enabledActivities
-        guard enabledIndex >= 0 && enabledIndex < enabled.count else { return nil }
+        guard enabledIndex < enabled.count else { return nil }
         
         let targetActivity = enabled[enabledIndex]
         var enabledCount = 0
@@ -194,6 +187,39 @@ class ActivityPlan {
     
     func updateConfig(for activity: ActivityType, config: ActivityConfig) {
         activities[activity] = config
+    }
+    
+    func setNextUpEnabledIndex(_ enabledIndex: Int?) {
+        nextUpEnabledIndex = enabledIndex
+    }
+    
+    func adjustNextUpIndexAfterDuplicate(at enabledIndex: Int) {
+        guard let currentNextUpIndex = nextUpEnabledIndex,
+              currentNextUpIndex > enabledIndex else { return }
+        nextUpEnabledIndex = currentNextUpIndex + 1
+    }
+    
+    func adjustNextUpIndexAfterDelete(at enabledIndex: Int) {
+        guard let currentNextUpIndex = nextUpEnabledIndex else { return }
+        if currentNextUpIndex == enabledIndex {
+            nextUpEnabledIndex = nil
+        } else if currentNextUpIndex > enabledIndex {
+            nextUpEnabledIndex = currentNextUpIndex - 1
+        }
+    }
+    
+    func adjustNextUpIndexAfterReorder(from oldEnabledOrder: [ActivityType], to newEnabledOrder: [ActivityType]) {
+        guard let oldNextUpIndex = nextUpEnabledIndex,
+              oldNextUpIndex < oldEnabledOrder.count else {
+            nextUpEnabledIndex = nil
+            return
+        }
+        let oldNextUpActivity = oldEnabledOrder[oldNextUpIndex]
+        if let newIndex = newEnabledOrder.firstIndex(of: oldNextUpActivity) {
+            nextUpEnabledIndex = newIndex
+        } else {
+            nextUpEnabledIndex = nil
+        }
     }
 }
 

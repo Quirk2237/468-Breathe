@@ -30,9 +30,4 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
         return true
     }
-    
-    func applicationWillTerminate(_ notification: Notification) {
-        // Ensure timer state is saved before app quits
-        windowManager?.timerManager.saveTimerState()
-    }
 }

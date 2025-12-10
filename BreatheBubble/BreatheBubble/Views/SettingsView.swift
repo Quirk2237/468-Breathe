@@ -226,20 +226,31 @@ struct SettingsView: View {
                                 activity: activity,
                                 accentColor: accentColor,
                                 statusIndicator: getActivityStatus(activity: activity, enabledIndex: index),
+                                isManuallySetAsNext: settings.activityPlan.nextUpEnabledIndex == index,
                                 onEdit: {
                                     navigationPath.append(activity)
                                 },
                                 onDuplicate: {
                                     if let orderIndex = settings.activityPlan.indexInActivityOrder(forEnabledIndex: index) {
                                         settings.activityPlan.duplicateActivity(at: orderIndex)
+                                        settings.activityPlan.adjustNextUpIndexAfterDuplicate(at: index)
                                         settings.saveActivitySettings()
                                     }
                                 },
                                 onDelete: {
                                     if let orderIndex = settings.activityPlan.indexInActivityOrder(forEnabledIndex: index) {
                                         settings.activityPlan.removeActivity(at: orderIndex)
+                                        settings.activityPlan.adjustNextUpIndexAfterDelete(at: index)
                                         settings.saveActivitySettings()
                                     }
+                                },
+                                onSetAsNext: {
+                                    if settings.activityPlan.nextUpEnabledIndex == index {
+                                        settings.activityPlan.setNextUpEnabledIndex(nil)
+                                    } else {
+                                        settings.activityPlan.setNextUpEnabledIndex(index)
+                                    }
+                                    settings.saveActivitySettings()
                                 }
                             )
                             .listRowSeparator(.hidden)
@@ -247,25 +258,17 @@ struct SettingsView: View {
                             .listRowBackground(Color.clear)
                         }
                         .onMove { source, destination in
-                            let enabledActivities = settings.activityPlan.enabledActivities
-                            var reorderedEnabled = enabledActivities
+                            let oldEnabledOrder = settings.activityPlan.enabledActivities
+                            var reorderedEnabled = oldEnabledOrder
                             reorderedEnabled.move(fromOffsets: source, toOffset: destination)
                             
-                            // Rebuild activityOrder with the new enabled order, preserving disabled activities
-                            var newOrder: [ActivityType] = []
                             let disabledActivities = settings.activityPlan.activityOrder.filter { 
                                 settings.activityPlan.activities[$0]?.enabled != true 
                             }
-                            
-                            // Add enabled activities in the new order
-                            for activity in reorderedEnabled {
-                                newOrder.append(activity)
-                            }
-                            
-                            // Add disabled activities at the end
-                            newOrder.append(contentsOf: disabledActivities)
+                            let newOrder = reorderedEnabled + disabledActivities
                             
                             settings.activityPlan.reorderActivities(newOrder)
+                            settings.activityPlan.adjustNextUpIndexAfterReorder(from: oldEnabledOrder, to: reorderedEnabled)
                             settings.saveActivitySettings()
                         }
                     }
@@ -367,9 +370,11 @@ struct ActivityRowView: View {
     let activity: ActivityType
     let accentColor: Color
     let statusIndicator: ActivityStatusIndicator
+    let isManuallySetAsNext: Bool
     let onEdit: () -> Void
     let onDuplicate: () -> Void
     let onDelete: () -> Void
+    let onSetAsNext: () -> Void
     
     var body: some View {
         HStack(spacing: 12) {
@@ -413,6 +418,17 @@ struct ActivityRowView: View {
         .padding(.horizontal, 8)
         .contentShape(Rectangle())
         .contextMenu {
+            Button {
+                onSetAsNext()
+            } label: {
+                Label(
+                    isManuallySetAsNext ? "Clear Next Up" : "Set as Next Up",
+                    systemImage: isManuallySetAsNext ? "star.slash" : "star"
+                )
+            }
+            
+            Divider()
+            
             Button {
                 onDuplicate()
             } label: {
